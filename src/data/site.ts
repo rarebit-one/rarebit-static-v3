@@ -30,7 +30,7 @@ export const benefits = [
     text: "Inbound prospects are researched, scored, and routed by agents before a human reads the email.",
     backgroundUrl: "/images/benefits/card-1.svg",
     iconUrl: "/images/benefits/icon-1.svg",
-    imageUrl: "/images/benefits/image-2.png",
+    imageUrl: "/images/benefits/image-2.webp",
     light: true,
   },
   {
@@ -39,7 +39,7 @@ export const benefits = [
     text: "Briefs become drafts, edits, and scheduled posts through a pipeline that's reviewed, not hand-cranked.",
     backgroundUrl: "/images/benefits/card-2.svg",
     iconUrl: "/images/benefits/icon-2.svg",
-    imageUrl: "/images/benefits/image-2.png",
+    imageUrl: "/images/benefits/image-2.webp",
   },
   {
     id: "2",
@@ -47,7 +47,7 @@ export const benefits = [
     text: "Agents triage issues, open pull requests, and babysit CI to green. Humans approve the merge.",
     backgroundUrl: "/images/benefits/card-3.svg",
     iconUrl: "/images/benefits/icon-3.svg",
-    imageUrl: "/images/benefits/image-2.png",
+    imageUrl: "/images/benefits/image-2.webp",
   },
   {
     id: "3",
@@ -55,7 +55,7 @@ export const benefits = [
     text: "Metrics are collected, summarized, and narrated into weekly updates nobody has to assemble by hand.",
     backgroundUrl: "/images/benefits/card-4.svg",
     iconUrl: "/images/benefits/icon-4.svg",
-    imageUrl: "/images/benefits/image-2.png",
+    imageUrl: "/images/benefits/image-2.webp",
     light: true,
   },
   {
@@ -64,7 +64,7 @@ export const benefits = [
     text: "Invoices, contracts, and bookkeeping run as supervised automations with a paper trail.",
     backgroundUrl: "/images/benefits/card-5.svg",
     iconUrl: "/images/benefits/icon-1.svg",
-    imageUrl: "/images/benefits/image-2.png",
+    imageUrl: "/images/benefits/image-2.webp",
   },
   {
     id: "5",
@@ -72,7 +72,7 @@ export const benefits = [
     text: "Synthetic checks, error triage, and incident summaries around the clock — the farm never sleeps.",
     backgroundUrl: "/images/benefits/card-6.svg",
     iconUrl: "/images/benefits/icon-2.svg",
-    imageUrl: "/images/benefits/image-2.png",
+    imageUrl: "/images/benefits/image-2.webp",
   },
 ];
 
@@ -112,7 +112,7 @@ export const roadmap = [
     text: "Specialized agents on every queue — research, code, content, ops — coordinated from a single control plane.",
     date: "Live now",
     status: "done",
-    imageUrl: "/images/roadmap/image-1.png",
+    imageUrl: "/images/roadmap/image-1.webp",
     colorful: true,
   },
   {
@@ -121,7 +121,7 @@ export const roadmap = [
     text: "Watch your automations work in real time: live operations feed, throughput, and what shipped this week.",
     date: "In the works",
     status: "progress",
-    imageUrl: "/images/roadmap/image-2.png",
+    imageUrl: "/images/roadmap/image-2.webp",
   },
   {
     id: "2",
@@ -129,7 +129,7 @@ export const roadmap = [
     text: "Automations that detect their own failures, retry with context, and summarize the incident when they can't.",
     date: "In the works",
     status: "progress",
-    imageUrl: "/images/roadmap/image-3.png",
+    imageUrl: "/images/roadmap/image-3.webp",
   },
   {
     id: "3",
@@ -137,6 +137,6 @@ export const roadmap = [
     text: "The auth, audit, ledger, and circuit-breaker building blocks we run on are open source — use them.",
     date: "Live now",
     status: "done",
-    imageUrl: "/images/roadmap/image-4.png",
+    imageUrl: "/images/roadmap/image-4.webp",
   },
 ];
