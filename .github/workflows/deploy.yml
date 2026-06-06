@@ -1,0 +1,64 @@
+name: Deploy
+
+# Tracks the DigitalOcean production deployment after a main-branch push.
+# rarebit-static-v3 is a DO App Platform *static site* that auto-deploys from
+# `main` via DO's GitHub integration; this workflow doesn't deploy — it polls
+# the DO API until that deployment goes live (or fails) so the result is a
+# visible CI signal (and a GitHub Deployment for the /land + status tooling).
+#
+# Triggers on the CI workflow completing for a main push (workflow_run), so CI
+# runs exactly once and this inherits its conclusion. ci.yml must be on `main`
+# for workflow_run to fire.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: read
+  # deployments: write must be granted here so the reusable tracker — which
+  # declares an `environment:` — can be granted it in turn (a called workflow's
+  # token is capped by the caller's permissions).
+  deployments: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  check-tracking:
+    name: Check DO tracking config
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      has_app_id: ${{ steps.check.outputs.has_app_id }}
+    steps:
+      - name: Check if DO tracking is configured
+        id: check
+        env:
+          DO_APP_ID: ${{ secrets.DO_APP_ID }}
+        run: |
+          if [ -n "$DO_APP_ID" ]; then
+            echo "has_app_id=true" >> "$GITHUB_OUTPUT"
+            echo "DO app ID is configured"
+          else
+            echo "has_app_id=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::DO_APP_ID not configured — skipping deployment tracking"
+          fi
+
+  track-deployment:
+    name: Production
+    needs: check-tracking
+    if: ${{ needs.check-tracking.outputs.has_app_id == 'true' }}
+    uses: ./.github/workflows/track-do-deployment.yml
+    with:
+      environment: production
+      environment_url: https://rarebit.one
+      # Under workflow_run, github.sha is this workflow file's commit, not the
+      # triggering CI run's commit — use the workflow_run head_sha.
+      expected_commit_sha: ${{ github.event.workflow_run.head_sha }}
+    secrets:
+      DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      DIGITALOCEAN_APP_ID: ${{ secrets.DO_APP_ID }}

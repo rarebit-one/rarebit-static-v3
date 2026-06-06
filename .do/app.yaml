@@ -1,0 +1,34 @@
+# DigitalOcean App Platform spec — rarebit.one static site (v3).
+#
+# Static Site tier (no container). DO's GitHub integration auto-builds and
+# deploys on push to `main`. `.github/workflows/deploy.yml` then polls the DO
+# API to surface deploy status back in GitHub.
+#
+# Apply changes to the live app with:
+#   doctl apps update <APP_ID> --spec .do/app.yaml
+#
+# The rarebit.one domains were cut over from the retired rarebit-static-v2 app
+# (a domain can only be PRIMARY on one app at a time). The zone is DO-managed,
+# so App Platform maintains the DNS records itself.
+name: rarebit-static-v3
+region: sgp
+
+static_sites:
+  - name: web
+    github:
+      repo: rarebit-one/rarebit-static-v3
+      branch: main
+      deploy_on_push: true
+    build_command: npm run build
+    output_dir: dist
+    environment_slug: node-js
+    index_document: index.html
+    error_document: 404.html
+
+domains:
+  - domain: rarebit.one
+    type: PRIMARY
+    zone: rarebit.one
+  - domain: www.rarebit.one
+    type: ALIAS
+    zone: rarebit.one

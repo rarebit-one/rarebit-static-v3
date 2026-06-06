@@ -1,0 +1,302 @@
+name: Track DigitalOcean Deployment
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "GitHub environment name (e.g., staging, production)"
+        required: true
+        type: string
+      environment_url:
+        description: "URL of the deployed environment"
+        required: true
+        type: string
+      expected_commit_sha:
+        description: "The commit SHA that should be deployed"
+        required: true
+        type: string
+      poll_interval:
+        description: "Seconds between DO API polls"
+        required: false
+        type: number
+        default: 15
+      poll_timeout:
+        description: "Maximum seconds to wait for deployment"
+        required: false
+        type: number
+        default: 600
+    secrets:
+      DIGITALOCEAN_ACCESS_TOKEN:
+        required: true
+      DIGITALOCEAN_APP_ID:
+        required: true
+
+permissions:
+  contents: read
+  deployments: write
+  # Required to post the per-environment deploy-status comment on the
+  # merged PR (see the "Comment deploy status on the merged PR" step).
+  pull-requests: write
+
+jobs:
+  track:
+    name: Track ${{ inputs.environment }} deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ inputs.environment_url }}
+
+    steps:
+      - name: Wait for DO deployment to complete
+        id: poll
+        env:
+          DO_API_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          DO_APP_ID: ${{ secrets.DIGITALOCEAN_APP_ID }}
+          EXPECTED_SHA: ${{ inputs.expected_commit_sha }}
+          POLL_INTERVAL: ${{ inputs.poll_interval }}
+          POLL_TIMEOUT: ${{ inputs.poll_timeout }}
+        run: |
+          echo "Tracking deployment of commit $EXPECTED_SHA to ${{ inputs.environment }}"
+          echo "Polling DO API every ${POLL_INTERVAL}s (timeout: ${POLL_TIMEOUT}s)"
+
+          ELAPSED=0
+
+          while [ "$ELAPSED" -lt "$POLL_TIMEOUT" ]; do
+            # Fetch recent deployments for the app
+            # `if !` keeps a failed curl from tripping the shell's `set -e`
+            # (GitHub's default `bash -eo pipefail`) so a transient API error
+            # retries instead of aborting the step with a cryptic exit code.
+            if ! RESPONSE=$(curl -sf \
+              -H "Authorization: Bearer $DO_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://api.digitalocean.com/v2/apps/$DO_APP_ID/deployments?per_page=50"); then
+              echo "::warning::Failed to fetch deployments from DO API — retrying"
+              sleep "$POLL_INTERVAL"
+              ELAPSED=$((ELAPSED + POLL_INTERVAL))
+              continue
+            fi
+
+            # Find the deployment matching our commit SHA. DO's deployment
+            # object has NO top-level .commit_sha — that field simply doesn't
+            # exist on the API response, so the previous `select(.commit_sha
+            # == $sha)` never matched anything and the tracker always timed
+            # out. For git-push-triggered deploys (DO's GitHub auto-deploy)
+            # the commit lives at .cause_details.git_push.commit_sha;
+            # component .source_commit_hash (services/workers/jobs/static_sites)
+            # is included as a fallback for manual redeploys without a
+            # git_push cause. `first // empty` yields empty when there's no
+            # match; jq's stderr is captured so a malformed API response
+            # surfaces instead of looking identical to "not deployed yet" and
+            # looping to timeout.
+            if ! DEPLOY_INFO=$(echo "$RESPONSE" | jq -r --arg sha "$EXPECTED_SHA" '
+              [ .deployments[]
+                | . as $d
+                | select(
+                    $d.cause_details.git_push.commit_sha == $sha
+                    or ([ ($d.services // [])[], ($d.workers // [])[],
+                          ($d.jobs // [])[], ($d.static_sites // [])[] ]
+                        | any(.source_commit_hash == $sha))
+                  )
+              ]
+              | first // empty
+              | {id: .id, phase: .phase, created_at: .created_at}
+            ' 2>&1); then
+              echo "::warning::Failed to parse DO API response: $DEPLOY_INFO"
+              echo "::warning::Raw response (first 500 chars): $(echo "$RESPONSE" | head -c 500)"
+              DEPLOY_INFO=""
+            fi
+
+            if [ -z "$DEPLOY_INFO" ]; then
+              echo "No deployment found for SHA $EXPECTED_SHA yet (${ELAPSED}s elapsed)"
+              sleep "$POLL_INTERVAL"
+              ELAPSED=$((ELAPSED + POLL_INTERVAL))
+              continue
+            fi
+
+            PHASE=$(echo "$DEPLOY_INFO" | jq -r '.phase')
+            DEPLOY_ID=$(echo "$DEPLOY_INFO" | jq -r '.id')
+            echo "Deployment $DEPLOY_ID — phase: $PHASE (${ELAPSED}s elapsed)"
+            # Expose to downstream steps (the PR-comment step). GITHUB_OUTPUT
+            # is append-mode; repeated writes simply take the last value,
+            # which is what we want — the comment step needs the terminal
+            # phase + deployment id, not whatever was seen mid-loop.
+            echo "deploy_id=$DEPLOY_ID" >> "$GITHUB_OUTPUT"
+            echo "phase=$PHASE" >> "$GITHUB_OUTPUT"
+
+            case "$PHASE" in
+              ACTIVE)
+                echo ""
+                echo "Deployment succeeded — commit $EXPECTED_SHA is live on ${{ inputs.environment }}"
+                echo ""
+                echo "### Deployment Successful" >> "$GITHUB_STEP_SUMMARY"
+                echo "" >> "$GITHUB_STEP_SUMMARY"
+                echo "- **Environment:** ${{ inputs.environment }}" >> "$GITHUB_STEP_SUMMARY"
+                echo "- **Commit:** \`$EXPECTED_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+                echo "- **DO Deployment ID:** \`$DEPLOY_ID\`" >> "$GITHUB_STEP_SUMMARY"
+                echo "- **URL:** ${{ inputs.environment_url }}" >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+                ;;
+              ERROR)
+                echo "::error::Deployment failed — DO reported ERROR for commit $EXPECTED_SHA"
+                echo ""
+                echo "### Deployment Failed" >> "$GITHUB_STEP_SUMMARY"
+                echo "" >> "$GITHUB_STEP_SUMMARY"
+                echo "- **Environment:** ${{ inputs.environment }}" >> "$GITHUB_STEP_SUMMARY"
+                echo "- **Commit:** \`$EXPECTED_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+                echo "- **DO Deployment ID:** \`$DEPLOY_ID\`" >> "$GITHUB_STEP_SUMMARY"
+                echo "- **Phase:** ERROR" >> "$GITHUB_STEP_SUMMARY"
+                exit 1
+                ;;
+              CANCELED)
+                echo "::error::Deployment was canceled on DO"
+                echo ""
+                echo "### Deployment Canceled" >> "$GITHUB_STEP_SUMMARY"
+                echo "" >> "$GITHUB_STEP_SUMMARY"
+                echo "- **Environment:** ${{ inputs.environment }}" >> "$GITHUB_STEP_SUMMARY"
+                echo "- **Commit:** \`$EXPECTED_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+                echo "- **DO Deployment ID:** \`$DEPLOY_ID\`" >> "$GITHUB_STEP_SUMMARY"
+                exit 1
+                ;;
+              SUPERSEDED)
+                # For staging with cancel-in-progress, the workflow itself gets canceled
+                # before reaching this state. This handles the edge case where DO supersedes
+                # a deployment independently. A newer deployment taking over isn't a failure
+                # of this pipeline — that newer deployment's own tracking run reports the
+                # live result — so exit cleanly rather than flagging a false red.
+                echo "::warning::Deployment was superseded by a newer deployment"
+                echo ""
+                echo "### Deployment Superseded" >> "$GITHUB_STEP_SUMMARY"
+                echo "" >> "$GITHUB_STEP_SUMMARY"
+                echo "A newer deployment replaced this one before it completed. The newer deployment's tracking run reports the live result." >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+                ;;
+              BUILDING|DEPLOYING|PENDING_BUILD|PENDING_DEPLOY)
+                # Still in progress — keep polling
+                ;;
+              *)
+                echo "Unknown phase: $PHASE — continuing to poll"
+                ;;
+            esac
+
+            sleep "$POLL_INTERVAL"
+            ELAPSED=$((ELAPSED + POLL_INTERVAL))
+          done
+
+          echo "::error::Timed out after ${POLL_TIMEOUT}s waiting for deployment of $EXPECTED_SHA"
+          echo ""
+          echo "### Deployment Timed Out" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "No successful deployment detected within ${POLL_TIMEOUT}s." >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      - name: Resolve PR for the tracked commit
+        id: pr
+        # always() so we still post a failure comment when the polling step
+        # exited non-zero. continue-on-error so a transient gh-api hiccup
+        # resolving the PR doesn't flip the comment step into the failure
+        # branch on what was actually a green deploy. Resolves the PR whose
+        # merge commit is the SHA we were tracking — squash, merge-commit,
+        # and rebase strategies all surface here. Empty when there's no PR
+        # (direct push to main), which the comment step then guards on.
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ inputs.expected_commit_sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # No stderr suppression — `|| true` already keeps the step green;
+          # surfacing API errors (404 / 401 / rate-limit) in the log is what
+          # we actually want when the comment mysteriously fails to appear.
+          PR=$(gh api "repos/$REPO/commits/$EXPECTED_SHA/pulls" \
+            --jq '.[0].number // empty' || true)
+          echo "number=$PR" >> "$GITHUB_OUTPUT"
+          if [ -n "$PR" ]; then
+            echo "Resolved PR #$PR for $EXPECTED_SHA"
+          else
+            echo "::notice::No PR associated with $EXPECTED_SHA — skipping PR comment"
+          fi
+
+      - name: Comment deploy status on the merged PR
+        # Posts a single, in-place-updated comment per environment so the
+        # PR's author sees the DO deploy outcome for their merge without
+        # hunting through Actions logs. Bidirectional — comments on success,
+        # failure, and the SUPERSEDED race. The marker scopes find-or-edit
+        # per environment, so the comment for staging vs production vs
+        # production-sg/my each maintain themselves independently, and a
+        # rerun refreshes the same comment rather than stacking duplicates.
+        # continue-on-error so a transient API hiccup posting the comment
+        # never masks the underlying deploy outcome.
+        if: always() && steps.pr.outputs.number != ''
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ steps.pr.outputs.number }}
+          EXPECTED_SHA: ${{ inputs.expected_commit_sha }}
+          ENV_NAME: ${{ inputs.environment }}
+          ENV_URL: ${{ inputs.environment_url }}
+          # steps.poll.outcome (vs job.status) pins success/failure to the
+          # actual DO poll outcome — immune to any later step inadvertently
+          # flipping job.status.
+          JOB_STATUS: ${{ steps.poll.outcome }}
+          DO_DEPLOY_ID: ${{ steps.poll.outputs.deploy_id }}
+          DO_PHASE: ${{ steps.poll.outputs.phase }}
+          DO_APP_ID: ${{ secrets.DIGITALOCEAN_APP_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${EXPECTED_SHA:0:9}"
+          MARKER="<!-- track-do-deployment:${ENV_NAME} -->"
+
+          DO_LINK=""
+          if [ -n "$DO_DEPLOY_ID" ] && [ -n "$DO_APP_ID" ]; then
+            DO_LINK=" · [DO deployment](https://cloud.digitalocean.com/apps/${DO_APP_ID}/deployments/${DO_DEPLOY_ID})"
+          fi
+
+          if [ "$JOB_STATUS" = "success" ] && [ "$DO_PHASE" = "SUPERSEDED" ]; then
+            ICON="🔁"
+            HEADLINE="**${ENV_NAME}** deploy of \`${SHORT_SHA}\` was superseded by a newer deploy"
+            LINKS="[Tracker run](${RUN_URL})${DO_LINK}"
+          elif [ "$JOB_STATUS" = "success" ]; then
+            ICON="✅"
+            HEADLINE="**${ENV_NAME}** deploy of \`${SHORT_SHA}\` is live"
+            LINKS="[Open ${ENV_NAME}](${ENV_URL}) · [Tracker run](${RUN_URL})${DO_LINK}"
+          elif [ "$DO_PHASE" = "CANCELED" ]; then
+            # User-initiated cancel on DO is meaningfully different from ERROR
+            # — nothing broke, the operator stopped it. Surface as a neutral
+            # warning rather than a 🚨 failure.
+            ICON="⚠️"
+            HEADLINE="**${ENV_NAME}** deploy of \`${SHORT_SHA}\` was canceled"
+            LINKS="[Tracker run](${RUN_URL})${DO_LINK}"
+          else
+            ICON="🚨"
+            PHASE_DETAIL="${DO_PHASE:-tracker timed out before any matching DO deployment}"
+            HEADLINE="**${ENV_NAME}** deploy of \`${SHORT_SHA}\` failed (\`${PHASE_DETAIL}\`)"
+            LINKS="[Tracker run](${RUN_URL})${DO_LINK}"
+          fi
+
+          BODY=$(printf '%s\n\n%s %s\n\n%s\n' "$MARKER" "$ICON" "$HEADLINE" "$LINKS")
+
+          # Find an existing comment with our marker (per environment) and
+          # update it in place. Re-runs and successive deploys to the same
+          # env each refresh the same comment instead of stacking duplicates.
+          # `--paginate` walks every page so the marker is found even on
+          # long-running PRs with >100 comments (the previous per_page=100
+          # cap left a latent duplicate-comment bug on the largest threads).
+          EXISTING=$(gh api --paginate "repos/$REPO/issues/${PR}/comments" \
+            | jq -rs --arg marker "$MARKER" \
+              '[.[] | .[] | select(.body | startswith($marker))] | first | .id // empty')
+
+          if [ -n "$EXISTING" ]; then
+            jq -n --arg body "$BODY" '{body:$body}' \
+              | gh api --method PATCH "repos/$REPO/issues/comments/$EXISTING" --input -
+            echo "Updated comment $EXISTING on PR #$PR"
+          else
+            jq -n --arg body "$BODY" '{body:$body}' \
+              | gh api --method POST "repos/$REPO/issues/${PR}/comments" --input -
+            echo "Created new comment on PR #$PR"
+          fi
