@@ -1,0 +1,75 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Section from "../components/Section.astro";
+import Heading from "../components/Heading.astro";
+import Tagline from "../components/Tagline.astro";
+import Button from "../components/Button.astro";
+import { openSourceCatalog } from "../data/openSource";
+import { site } from "../data/site";
+---
+
+<Layout
+  title="Open source — Rarebit"
+  description="The primitives the Rarebit automation farm runs on — auth, audit, ledger, health, and circuit-breaker building blocks — are open source. Use them."
+>
+  <Section crosses>
+    <div class="container">
+      <Heading
+        tag="The future is handmade"
+        title="Open-source primitives"
+        text="The building blocks we run on — auth, reliability, and data patterns extracted from real production work, released as focused libraries. No frameworks, no lock-in."
+      />
+
+      {
+        openSourceCatalog.map((category) => (
+          <div class="mb-15 last:mb-0">
+            <h3 class="h4 mb-8">{category.title}</h3>
+            <div class="grid gap-5 lg:grid-cols-2">
+              {category.repos.map((repo) => (
+                <div class="relative flex flex-col p-8 border border-n-1/10 rounded-3xl bg-n-7 overflow-hidden xl:p-10">
+                  <div class="absolute top-0 left-0 max-w-full opacity-40 pointer-events-none">
+                    <img class="w-full" src="/images/grid.png" width="550" height="550" alt="" />
+                  </div>
+                  <div class="relative z-1 flex flex-col h-full">
+                    <div class="flex items-center justify-between mb-4">
+                      <Tagline>{repo.kind}</Tagline>
+                      <div class="tagline text-n-4">{repo.version}</div>
+                    </div>
+                    <h5 class="h6 mb-2">{repo.name}</h5>
+                    <p class="body-2 mb-4 text-n-2">{repo.description}</p>
+                    <p class="body-2 mb-6 text-n-4">{repo.body}</p>
+                    {repo.bullets && (
+                      <ul class="body-2 mb-6">
+                        {repo.bullets.map((bullet) => (
+                          <li class="flex items-start py-2 border-t border-n-6">
+                            <img src="/images/check.svg" width="20" height="20" alt="" />
+                            <p class="ml-3 text-n-3">{bullet}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <a
+                      class="button inline-flex items-center mt-auto text-n-1 transition-colors hover:text-color-1"
+                      href={`https://github.com/rarebit-one/${repo.repo}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View on GitHub
+                      <svg class="ml-3 fill-current" width="16" height="16" viewBox="0 0 24 24">
+                        <path d="M8.293 5.293a1 1 0 0 1 1.414 0l6 6a1 1 0 0 1 0 1.414l-6 6a1 1 0 0 1-1.414-1.414L13.586 12 8.293 6.707a1 1 0 0 1 0-1.414z" />
+                      </svg>
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      }
+
+      <div class="flex justify-center mt-15">
+        <Button href={site.github}>Everything on GitHub</Button>
+      </div>
+    </div>
+  </Section>
+</Layout>

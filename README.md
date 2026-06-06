@@ -24,8 +24,11 @@ npm run preview  # serve the build locally
 | Path | Purpose |
 |------|---------|
 | `src/styles/global.css` | Brainwave design tokens (Tailwind 4 `@theme`) + component classes |
-| `src/data/site.ts` | All page content: nav, stats, benefits, roadmap, contact |
+| `src/data/site.ts` | Page content: nav, stats, benefits, roadmap, legal entity, MCP endpoint |
+| `src/data/openSource.ts` | The /open-source catalog |
 | `src/components/` | Ported Brainwave primitives (Section, Button, Heading, …) |
 | `src/components/sections/` | Home page sections (Hero, Benefits, Operations, …) |
+| `src/pages/` | `index`, `open-source`, `connect` (MCP setup), `404` |
+| `functions/` | DO Functions component — the MCP server at `/mcp` |
 | `public/images/rarebit/` | Brand assets — logo + cinematic brand art |
 | `docs/brand-guide.png` | Rarebit One brand guide (colors, type, taglines) |

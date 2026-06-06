@@ -6,6 +6,17 @@ export const site = {
     "Rarebit runs an AI automation farm: agents and automations handle the workflows, humans direct, review, and ship. Small teams. Impossible things.",
   email: "hello@rarebit.one",
   github: "https://github.com/rarebit-one",
+  // MCP endpoint surfaced on /connect — the front door for AI assistants.
+  // Served by the DO Functions component in this same app (see functions/).
+  mcpEndpoint: "https://rarebit.one/mcp",
+};
+
+// Registered entity, from rarebit-ops entity/profile.yml (ACRA business
+// profile, 2026-05-24). Name and UEN are public record; keep them verbatim.
+export const legal = {
+  name: "RAREBIT ONE",
+  uen: "53503079K",
+  address: "60 Paya Lebar Road, #06-28, Paya Lebar Square, Singapore 409051",
 };
 
 export const navigation = [
@@ -13,7 +24,8 @@ export const navigation = [
   { id: "1", title: "How we work", url: "/#how-we-work" },
   { id: "2", title: "Operations", url: "/#operations" },
   { id: "3", title: "Roadmap", url: "/#roadmap" },
-  { id: "4", title: "Get in touch", url: `mailto:${site.email}`, onlyMobile: true },
+  { id: "4", title: "Open source", url: "/open-source" },
+  { id: "5", title: "Connect", url: "/connect", onlyMobile: true },
 ];
 
 export const stats = [

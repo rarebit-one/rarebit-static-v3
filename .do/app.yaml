@@ -10,6 +10,12 @@
 # The rarebit.one domains were cut over from the retired rarebit-static-v2 app
 # (a domain can only be PRIMARY on one app at a time). The zone is DO-managed,
 # so App Platform maintains the DNS records itself.
+#
+# The `mcp` functions component serves https://rarebit.one/mcp (the ingress
+# rewrites /mcp → /mcp/server, i.e. package `mcp` / function `server` under
+# functions/). Its SPACES_KEY + SPACES_SECRET env vars (the inquiry inbox
+# credentials) are set on the live app only — never commit them here; without
+# them submit_inquiry degrades to an email-fallback message.
 name: rarebit-static-v3
 region: sgp
 
@@ -24,6 +30,35 @@ static_sites:
     environment_slug: node-js
     index_document: index.html
     error_document: 404.html
+
+functions:
+  - name: mcp
+    source_dir: functions
+    github:
+      repo: rarebit-one/rarebit-static-v3
+      branch: main
+      deploy_on_push: true
+    envs:
+      - key: SPACES_BUCKET
+        scope: RUN_TIME
+        value: rarebit-mcp-inbox
+      - key: SPACES_REGION
+        scope: RUN_TIME
+        value: sgp1
+
+ingress:
+  rules:
+    - match:
+        path:
+          prefix: /mcp
+      component:
+        name: mcp
+        rewrite: /mcp/server
+    - match:
+        path:
+          prefix: /
+      component:
+        name: web
 
 domains:
   - domain: rarebit.one

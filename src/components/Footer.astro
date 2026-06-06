@@ -1,7 +1,7 @@
 ---
 import Section from "./Section.astro";
 import Logo from "./Logo.astro";
-import { navigation, site } from "../data/site";
+import { navigation, site, legal } from "../data/site";
 
 const year = new Date().getFullYear();
 ---
@@ -27,8 +27,9 @@ const year = new Date().getFullYear();
     </nav>
   </div>
   <div class="lg:flex lg:items-center lg:justify-between">
-    <div class="hidden caption text-n-4 lg:block">
-      © {year} {site.name} · Human creativity. Amplified.
+    <div class="caption text-n-4 mb-6 text-center lg:mb-0 lg:text-left">
+      <div>© {year} {legal.name} (UEN {legal.uen}) · Human creativity. Amplified.</div>
+      <div class="mt-1 text-n-4/70">{legal.address}</div>
     </div>
     <div class="flex justify-center gap-8">
       <a

@@ -1,0 +1,16 @@
+# DigitalOcean Functions project — the MCP server behind https://rarebit.one/mcp
+#
+# Deployed as a `functions` component of the rarebit-static-v3 App Platform app
+# (see .do/app.yaml). The app's ingress rewrites /mcp → /mcp/server, which is
+# this package/function pair.
+#
+# SPACES_* env vars (the inquiry inbox) are injected by the app spec, not here.
+packages:
+  - name: mcp
+    functions:
+      - name: server
+        runtime: nodejs:18
+        web: raw
+        limits:
+          timeout: 15000
+          memory: 256

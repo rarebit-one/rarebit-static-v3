@@ -34,8 +34,18 @@ npm run preview  # serve dist/
 - **Copy centers on the AI automation farm** — AI adoption work, workflow automation, agents with
   humans in the loop. **Never name clients.** Brand voice from `docs/brand-guide.png`: taglines
   like "Small Teams. Impossible Things." / "Human Creativity. Amplified."
-- **Content lives in `src/data/site.ts`** (nav, stats, benefits, collaboration, roadmap, contact).
+- **Content lives in `src/data/site.ts`** (nav, stats, benefits, collaboration, roadmap, contact)
+  and `src/data/openSource.ts` (the /open-source catalog — descriptions are verbatim from v2's
+  source-of-truth copy; keep them in sync with the gem READMEs when versions bump).
   Stats are playful fakes ("Managers: 0") — keep them obviously tongue-in-cheek, not claims.
+- **Legal footer** (name, UEN, registered address) mirrors `rarebit-ops` `entity/profile.yml` —
+  that file is the source of truth; update here when ACRA details change.
+- **Contact is MCP-first.** All CTAs route to `/connect`, which documents the MCP endpoint
+  (`https://rarebit.one/mcp`); email is the fallback. The endpoint is a DO Functions component in
+  the same app (`functions/packages/mcp/server/index.mjs` — zero-dependency Streamable HTTP
+  JSON-RPC, canned content + a SigV4 writer that drops `submit_inquiry` payloads into the
+  `rarebit-mcp-inbox` Spaces bucket, sgp1). Smoke-test it locally by importing `main` and posting
+  JSON-RPC envelopes; `tools/call submit_inquiry` needs `SPACES_*` env vars.
 - **Shared SVG gradient defs** (`#btn-*`, `#brackets-*`) live once in `Layout.astro`; Button and
   Tagline reference them by id. The Benefits clip-path (`#benefits`) lives in `Benefits.astro`.
 - **Motion is CSS-only** and gated behind `prefers-reduced-motion` (orb floats, caret blink in
