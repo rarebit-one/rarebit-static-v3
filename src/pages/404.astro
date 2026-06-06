@@ -1,0 +1,20 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Section from "../components/Section.astro";
+import Button from "../components/Button.astro";
+import { site } from "../data/site";
+---
+
+<Layout title={`404 — ${site.name}`}>
+  <Section crosses>
+    <div class="container">
+      <div class="relative max-w-[43.125rem] mx-auto py-20 text-center">
+        <h1 class="h1 mb-6">Signal lost</h1>
+        <p class="body-1 mb-8 text-n-4">
+          No automation runs on this route. The farm has logged the anomaly.
+        </p>
+        <Button href="/" white>Back to the farm</Button>
+      </div>
+    </div>
+  </Section>
+</Layout>

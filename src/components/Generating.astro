@@ -1,0 +1,13 @@
+---
+interface Props {
+  class?: string;
+  label?: string;
+}
+
+const { class: className = "", label = "Agents are running · 24/7" } = Astro.props;
+---
+
+<div class={`flex items-center h-[3.375rem] px-6 bg-n-8/80 rounded-[1.6875rem] text-base ${className}`}>
+  <img class="w-5 h-5 mr-4" src="/images/loading.png" width="20" height="20" alt="" />
+  {label}<span class="caret-blink">|</span>
+</div>

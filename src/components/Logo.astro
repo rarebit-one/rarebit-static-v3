@@ -1,0 +1,16 @@
+---
+import { site } from "../data/site";
+
+interface Props {
+  class?: string;
+}
+
+const { class: className = "" } = Astro.props;
+---
+
+<a class={`flex items-center gap-3 ${className}`} href="/">
+  <img src="/images/rarebit/logo.png" width="40" height="40" alt={site.name} />
+  <span class="font-grotesk text-lg font-light tracking-tagline uppercase text-n-1">
+    Rarebit<span class="text-n-4">.one</span>
+  </span>
+</a>

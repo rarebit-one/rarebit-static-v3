@@ -1,0 +1,126 @@
+@import "tailwindcss";
+
+/*
+ * Brainwave (UI8) design system, ported from the v1 Tailwind 3 config
+ * to Tailwind 4 CSS-first @theme tokens. Palette and type scale are
+ * verbatim from the template — don't re-tint; brand color arrives via
+ * imagery (logo, dashboards), not the chrome.
+ */
+@theme {
+  --color-color-1: #ac6aff;
+  --color-color-2: #ffc876;
+  --color-color-3: #ff776f;
+  --color-color-4: #7adb78;
+  --color-color-5: #858dff;
+  --color-color-6: #ff98e2;
+
+  --color-stroke-1: #26242c;
+
+  --color-n-1: #ffffff;
+  --color-n-2: #cac6dd;
+  --color-n-3: #ada8c3;
+  --color-n-4: #757185;
+  --color-n-5: #3f3a52;
+  --color-n-6: #252134;
+  --color-n-7: #15131d;
+  --color-n-8: #0e0c15;
+
+  --font-sans: "Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-code: "Source Code Pro", ui-monospace, monospace;
+  --font-grotesk: "Space Grotesk", ui-sans-serif, sans-serif;
+
+  --tracking-tagline: 0.15em;
+
+  --default-transition-duration: 200ms;
+  --default-transition-timing-function: linear;
+}
+
+@utility bg-conic-gradient {
+  background-image: conic-gradient(
+    from 225deg,
+    #ffc876,
+    #79fff7,
+    #9f53ff,
+    #ff98e2,
+    #ffc876
+  );
+}
+
+@utility tap-highlight-color {
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+
+@layer components {
+  .container {
+    @apply max-w-[77.5rem] mx-auto px-5 md:px-10 lg:px-15 xl:max-w-[87.5rem];
+  }
+  .h1 {
+    @apply font-semibold text-[2.5rem] leading-[3.25rem] md:text-[2.75rem] md:leading-[3.75rem] lg:text-[3.25rem] lg:leading-[4.0625rem] xl:text-[3.75rem] xl:leading-[4.5rem];
+  }
+  .h2 {
+    @apply text-[1.75rem] leading-[2.5rem] md:text-[2rem] md:leading-[2.5rem] lg:text-[2.5rem] lg:leading-[3.5rem] xl:text-[3rem] xl:leading-tight;
+  }
+  .h3 {
+    @apply text-[2rem] leading-normal md:text-[2.5rem];
+  }
+  .h4 {
+    @apply text-[2rem] leading-normal;
+  }
+  .h5 {
+    @apply text-2xl leading-normal;
+  }
+  .h6 {
+    @apply font-semibold text-lg leading-8;
+  }
+  .body-1 {
+    @apply text-[0.875rem] leading-[1.5rem] md:text-[1rem] md:leading-[1.75rem] lg:text-[1.25rem] lg:leading-8;
+  }
+  .body-2 {
+    @apply font-light text-[0.875rem] leading-6 md:text-base;
+  }
+  .caption {
+    @apply text-sm;
+  }
+  .tagline {
+    @apply font-grotesk font-light text-xs tracking-tagline uppercase;
+  }
+  .quote {
+    @apply font-code text-lg leading-normal;
+  }
+  .button {
+    @apply font-code text-xs font-bold uppercase tracking-wider;
+  }
+}
+
+/* Smooth anchor scrolling for the one-page nav */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Floating hero orbs — replaces the template's react-just-parallax dots */
+@media (prefers-reduced-motion: no-preference) {
+  .orb-float {
+    animation: orb-float 6s ease-in-out infinite;
+  }
+  .orb-float-delayed {
+    animation: orb-float 7s ease-in-out 1.5s infinite;
+  }
+  @keyframes orb-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-0.75rem);
+    }
+  }
+
+  .caret-blink {
+    animation: caret-blink 1.1s steps(1) infinite;
+  }
+  @keyframes caret-blink {
+    50% {
+      opacity: 0;
+    }
+  }
+}

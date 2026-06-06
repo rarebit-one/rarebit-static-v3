@@ -1,0 +1,181 @@
+---
+import Section from "../Section.astro";
+import Heading from "../Heading.astro";
+import Generating from "../Generating.astro";
+---
+
+<Section id="operations">
+  <div class="container">
+    <Heading
+      title="The factory is running"
+      text="Real automations. Real results. Right now — a look inside the farm."
+    />
+
+    <div class="relative">
+      {/* Big panel: portrait ops dashboard with copy on the right */}
+      <div
+        class="relative z-1 flex items-center h-[38.75rem] mb-5 p-8 border border-n-1/10 rounded-3xl overflow-hidden lg:h-[38.75rem] lg:p-20 xl:h-[45.75rem]"
+      >
+        <div class="absolute top-0 left-0 w-full h-full pointer-events-none md:w-3/5 xl:w-auto">
+          <img
+            class="w-full h-full object-cover md:object-left"
+            src="/images/rarebit/dashboard-portrait.png"
+            width="1024"
+            height="1536"
+            alt="Rarebit live operations dashboard"
+          />
+          <div class="absolute inset-0 bg-gradient-to-r from-n-8/0 via-n-8/60 to-n-8 md:via-n-8/30"></div>
+        </div>
+
+        <div class="relative z-1 max-w-[17rem] ml-auto">
+          <h4 class="h4 mb-4">One operator</h4>
+          <p class="body-2 mb-[3.125rem] text-n-3">
+            The leverage of an agency, without the overhead. Agents work every queue; a human
+            signs off on what ships.
+          </p>
+          <ul class="body-2">
+            {
+              ["Live operations feed", "Agents on every queue", "Humans approve the merge"].map(
+                (item) => (
+                  <li class="flex items-start py-4 border-t border-n-6">
+                    <img src="/images/check.svg" width="24" height="24" alt="" />
+                    <p class="ml-4">{item}</p>
+                  </li>
+                )
+              )
+            }
+          </ul>
+        </div>
+
+        <Generating
+          label="Workflow evolution · every second"
+          class="absolute left-4 right-4 bottom-4 border border-n-1/10 lg:left-1/2 lg:right-auto lg:bottom-8 lg:-translate-x-1/2"
+        />
+      </div>
+
+      <div class="relative z-1 grid gap-5 lg:grid-cols-2">
+        {/* Factory dashboard with chat-style instruction */}
+        <div class="relative min-h-[38.75rem] border border-n-1/10 rounded-3xl overflow-hidden">
+          <div class="absolute inset-0">
+            <img
+              class="w-full h-full object-cover"
+              src="/images/rarebit/dashboard-factory.png"
+              width="1536"
+              height="1024"
+              alt="Rarebit automation factory dashboard"
+            />
+          </div>
+          <div
+            class="absolute inset-0 flex flex-col justify-end p-8 bg-gradient-to-b from-n-8/0 to-n-8/90 lg:p-15"
+          >
+            <h4 class="h4 mb-4">Direct the farm</h4>
+            <p class="body-2 text-n-3">
+              Workflows are dispatched in plain language. The farm figures out the rest and
+              reports back with receipts.
+            </p>
+          </div>
+          <div
+            class="absolute top-8 right-8 max-w-[17.5rem] py-6 px-8 bg-black rounded-t-xl rounded-bl-xl font-code text-base lg:top-16 lg:right-[8.75rem] lg:max-w-[17.5rem]"
+          >
+            Run the weekly report and draft the client update
+            <svg
+              class="absolute left-full bottom-0"
+              xmlns="http://www.w3.org/2000/svg"
+              width="26"
+              height="37"
+            >
+              <path d="M21.843 37.001c3.564 0 5.348-4.309 2.829-6.828L3.515 9.015A12 12 0 0 1 0 .53v36.471h21.843z"
+              ></path>
+            </svg>
+          </div>
+        </div>
+
+        {/* Throughput panel with reply bubble over grid art */}
+        <div class="p-4 bg-n-7 rounded-3xl overflow-hidden lg:min-h-[45.75rem]">
+          <div class="py-12 px-4 xl:px-8">
+            <h4 class="h4 mb-4">Throughput, on tap</h4>
+            <p class="body-2 mb-[2.25rem] text-n-3">
+              Research, drafts, reviews, deploys — the queue drains itself. What used to take a
+              team a week lands before stand-up.
+            </p>
+            <ul class="flex items-center justify-between">
+              {
+                [
+                  "/images/icons/recording-03.svg",
+                  "/images/icons/recording-01.svg",
+                  "/images/icons/disc-02.svg",
+                  "/images/icons/chrome-cast.svg",
+                  "/images/icons/sliders-04.svg",
+                ].map((item, index) => (
+                  <li
+                    class={
+                      index === 2
+                        ? "flex items-center justify-center w-[3rem] h-[3rem] p-0.25 bg-conic-gradient rounded-2xl md:w-[4.5rem] md:h-[4.5rem]"
+                        : "flex items-center justify-center w-10 h-10 bg-n-6 rounded-2xl md:w-15 md:h-15"
+                    }
+                  >
+                    <div
+                      class={
+                        index === 2
+                          ? "flex items-center justify-center w-full h-full bg-n-7 rounded-[0.9375rem]"
+                          : "flex items-center justify-center"
+                      }
+                    >
+                      <img src={item} width="24" height="24" alt="" />
+                    </div>
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
+
+          <div class="relative h-[20.5rem] bg-n-8 rounded-xl overflow-hidden md:h-[25rem]">
+            <img
+              class="w-full h-full object-cover opacity-50"
+              src="/images/grid.png"
+              width="550"
+              height="550"
+              alt=""
+            />
+            <div
+              class="absolute top-8 left-[3.125rem] w-full max-w-[14rem] pt-2.5 pr-2.5 pb-7 pl-5 bg-n-6 rounded-t-xl rounded-br-xl font-code text-base md:max-w-[17.5rem]"
+            >
+              Report generated. Client update drafted for review.
+              <div
+                class="absolute left-5 -bottom-[1.125rem] flex items-center justify-center w-[2.25rem] h-[2.25rem] bg-color-1 rounded-[0.75rem]"
+              >
+                <img src="/images/rarebit/logo.png" width="26" height="26" alt="Rarebit" />
+              </div>
+              <div class="tagline absolute right-2.5 bottom-1 text-[0.625rem] text-n-3 uppercase">
+                just now
+              </div>
+              <svg
+                class="absolute right-full bottom-0 -scale-x-100"
+                xmlns="http://www.w3.org/2000/svg"
+                width="26"
+                height="37"
+              >
+                <path
+                  class="fill-n-6"
+                  d="M21.843 37.001c3.564 0 5.348-4.309 2.829-6.828L3.515 9.015A12 12 0 0 1 0 .53v36.471h21.843z"
+                ></path>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="absolute top-0 -left-[10rem] w-[56.625rem] h-[56.625rem] opacity-50 mix-blend-color-dodge pointer-events-none"
+      >
+        <img
+          class="absolute top-1/2 left-1/2 w-[79.5625rem] max-w-[79.5625rem] h-[88.5625rem] -translate-x-1/2 -translate-y-1/2"
+          src="/images/gradient.png"
+          width="1417"
+          height="1417"
+          alt=""
+        />
+      </div>
+    </div>
+  </div>
+</Section>

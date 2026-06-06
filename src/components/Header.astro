@@ -1,0 +1,111 @@
+---
+import Button from "./Button.astro";
+import Logo from "./Logo.astro";
+import { navigation, site } from "../data/site";
+---
+
+<header
+  class="fixed top-0 left-0 z-50 w-full bg-n-8/90 backdrop-blur-sm border-b border-n-6"
+  data-header
+>
+  <div class="flex items-center h-[4.75rem] px-5 lg:h-[5.25rem] lg:px-7.5 xl:px-10">
+    <Logo class="xl:mr-8" />
+
+    <nav
+      class="hidden fixed top-[4.8125rem] left-0 right-0 bottom-0 bg-n-8 lg:static lg:flex lg:mx-auto lg:bg-transparent"
+      data-nav
+    >
+      <div class="relative z-2 flex flex-col items-center justify-center m-auto lg:flex-row">
+        {
+          navigation.map((item) => (
+            <a
+              class={`block relative font-code text-2xl uppercase text-n-1 transition-colors hover:text-color-1 ${
+                item.onlyMobile ? "lg:hidden" : ""
+              } px-6 py-6 md:py-8 lg:-mr-0.25 lg:text-xs lg:font-semibold lg:text-n-1/50 lg:leading-5 lg:hover:text-n-1 xl:px-12`}
+              href={item.url}
+              data-nav-link
+            >
+              {item.title}
+              <div class="hidden absolute left-0 bottom-0 w-0.25 h-1.5 bg-n-6 lg:block" />
+              <div class="hidden absolute right-0 bottom-0 w-0.25 h-1.5 bg-n-6 lg:block" />
+            </a>
+          ))
+        }
+      </div>
+
+      <div class="absolute inset-0 pointer-events-none lg:hidden">
+        <div
+          class="absolute top-1/2 left-1/2 w-[51.375rem] aspect-square border border-n-2/10 rounded-full -translate-x-1/2 -translate-y-1/2"
+        >
+          <div
+            class="absolute top-1/2 left-1/2 w-[36.125rem] aspect-square border border-n-2/10 rounded-full -translate-x-1/2 -translate-y-1/2"
+          >
+          </div>
+          <div
+            class="absolute top-1/2 left-1/2 w-[23.125rem] aspect-square border border-n-2/10 rounded-full -translate-x-1/2 -translate-y-1/2"
+          >
+          </div>
+        </div>
+        <div class="absolute top-0 left-5 w-0.25 h-full bg-n-6"></div>
+        <div class="absolute top-0 right-5 w-0.25 h-full bg-n-6"></div>
+        <div
+          class="absolute top-[4.4rem] left-16 w-3 h-3 bg-gradient-to-b from-[#DD734F] to-[#1A1A32] rounded-full"
+        >
+        </div>
+        <div
+          class="absolute top-[12.6rem] right-16 w-3 h-3 bg-gradient-to-b from-[#B9AEDF] to-[#1A1A32] rounded-full"
+        >
+        </div>
+        <div
+          class="absolute top-[26.8rem] left-12 w-6 h-6 bg-gradient-to-b from-[#88E5BE] to-[#1A1A32] rounded-full"
+        >
+        </div>
+      </div>
+    </nav>
+
+    <a
+      class="button hidden mr-8 text-n-1/50 transition-colors hover:text-n-1 lg:block"
+      href={site.github}
+      target="_blank"
+      rel="noreferrer"
+    >
+      GitHub
+    </a>
+    <Button class="hidden lg:flex" href={`mailto:${site.email}`}>Get in touch</Button>
+
+    <Button class="ml-auto lg:hidden" px="px-3" data-nav-toggle>
+      <svg class="overflow-visible" width="20" height="12" viewBox="0 0 20 12">
+        <rect class="transition-all origin-center" y="0" width="20" height="2" rx="1" fill="white"
+        ></rect>
+        <rect class="transition-all origin-center" y="10" width="20" height="2" rx="1" fill="white"
+        ></rect>
+      </svg>
+    </Button>
+  </div>
+</header>
+
+<script>
+  const header = document.querySelector("[data-header]");
+  const nav = header?.querySelector("[data-nav]");
+  const toggle = header?.querySelector("[data-nav-toggle]");
+  const [topBar, bottomBar] = toggle?.querySelectorAll("rect") ?? [];
+
+  let open = false;
+
+  const setOpen = (next: boolean) => {
+    open = next;
+    nav?.classList.toggle("hidden", !open);
+    nav?.classList.toggle("flex", open);
+    header?.classList.toggle("bg-n-8", open);
+    document.body.classList.toggle("overflow-hidden", open);
+    topBar?.setAttribute("y", open ? "5" : "0");
+    topBar?.setAttribute("transform", open ? "rotate(45)" : "rotate(0)");
+    bottomBar?.setAttribute("y", open ? "5" : "10");
+    bottomBar?.setAttribute("transform", open ? "rotate(-45)" : "rotate(0)");
+  };
+
+  toggle?.addEventListener("click", () => setOpen(!open));
+  nav?.querySelectorAll("[data-nav-link]").forEach((link) => {
+    link.addEventListener("click", () => setOpen(false));
+  });
+</script>

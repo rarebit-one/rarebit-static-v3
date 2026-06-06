@@ -1,0 +1,180 @@
+---
+import Section from "../Section.astro";
+import Button from "../Button.astro";
+import Generating from "../Generating.astro";
+import { stats } from "../../data/site";
+---
+
+<Section
+  class="-mt-[4.75rem] pt-[8.25rem] pb-4 overflow-hidden md:pt-[9.75rem] md:pb-[4.8rem] lg:-mt-[5.25rem] lg:-mb-40 lg:pt-[12.25rem] lg:pb-[13.8rem]"
+  crosses
+  crossesOffset="lg:translate-y-[5.25rem]"
+  customPaddings
+>
+  <div class="container relative">
+    <div
+      class="relative z-1 max-w-[62rem] mx-auto mb-[3.875rem] text-center md:mb-20 lg:mb-[6.25rem]"
+    >
+      <h1 class="h1 mb-6">
+        One AI. Endless output. Meet the automation farm behind{" "}
+        <span class="inline-block relative">
+          Rarebit
+          <img
+            class="absolute top-full left-0 w-full xl:-mt-2"
+            src="/images/curve.png"
+            width="624"
+            height="28"
+            alt=""
+          />
+        </span>
+      </h1>
+      <p class="body-1 max-w-3xl mx-auto mb-6 text-n-2 lg:mb-8">
+        We rebuilt our delivery pipeline around AI agents — research, code, content, and ops run
+        as automations while humans direct, review, and ship. Small teams. Impossible things.
+      </p>
+      <Button href="/#automations" white>See what's running</Button>
+    </div>
+
+    <div class="relative max-w-[23.25rem] mx-auto md:max-w-5xl xl:mb-24">
+      <div class="relative z-1 p-0.5 rounded-2xl bg-conic-gradient">
+        <div class="relative bg-n-8 rounded-[0.875rem]">
+          <div class="h-[1.375rem] bg-[#43435C] rounded-t-[0.875rem]"></div>
+          <div
+            class="aspect-[33/40] rounded-b-[0.875rem] overflow-hidden md:aspect-[688/490] lg:aspect-[1024/490]"
+          >
+            <img
+              class="w-full h-full object-cover object-top"
+              src="/images/rarebit/dashboard-factory.png"
+              width="1536"
+              height="1024"
+              alt="Rarebit automation farm — live operations dashboard"
+            />
+          </div>
+
+          <Generating
+            class="absolute left-4 right-4 bottom-5 md:left-1/2 md:right-auto md:bottom-8 md:w-[30.5rem] md:-translate-x-1/2"
+          />
+
+          <ul
+            class="hidden absolute -left-[5.5rem] bottom-[7.625rem] px-1 py-1 bg-[#474060]/40 backdrop-blur border border-n-1/10 rounded-2xl xl:flex orb-float"
+          >
+            {
+              [
+                "/images/icons/home-smile.svg",
+                "/images/icons/file-02.svg",
+                "/images/icons/search-md.svg",
+                "/images/icons/plus-square.svg",
+              ].map((icon) => (
+                <li class="p-5">
+                  <img src={icon} width="24" height="25" alt="" />
+                </li>
+              ))
+            }
+          </ul>
+
+          <div
+            class="hidden absolute -right-[5.5rem] bottom-[11.25rem] w-[18.375rem] xl:flex items-center p-4 pr-6 bg-[#474060]/40 backdrop-blur border border-n-1/10 rounded-2xl orb-float-delayed"
+          >
+            <div class="mr-5">
+              <img
+                class="w-full rounded-xl"
+                src="/images/notification/image-1.png"
+                width="52"
+                height="52"
+                alt=""
+              />
+            </div>
+            <div class="flex-1">
+              <h6 class="mb-1 font-semibold text-base">PR reviewed &amp; merged</h6>
+              <div class="flex items-center justify-between">
+                <ul class="flex -m-0.5">
+                  {
+                    [
+                      "/images/notification/image-4.png",
+                      "/images/notification/image-3.png",
+                      "/images/notification/image-2.png",
+                    ].map((item, index) => (
+                      <li
+                        class={`flex w-6 h-6 border-2 border-[#2E2A41] rounded-full overflow-hidden ${
+                          index !== 0 ? "-ml-2" : ""
+                        }`}
+                      >
+                        <img class="w-full" src={item} width="20" height="20" alt="" />
+                      </li>
+                    ))
+                  }
+                </ul>
+                <div class="body-2 text-[#6C7275]">1m ago</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="relative z-1 h-6 mx-2.5 bg-[#1B1B2E] shadow-xl rounded-b-[1.25rem] lg:h-6 lg:mx-8"></div>
+      <div class="relative z-1 h-6 mx-6 bg-[#1B1B2E]/70 shadow-xl rounded-b-[1.25rem] lg:h-6 lg:mx-20"></div>
+
+      <div
+        class="absolute -top-[54%] left-1/2 w-[234%] -translate-x-1/2 md:-top-[46%] md:w-[138%] lg:-top-[104%]"
+      >
+        <img class="w-full" src="/images/hero/background.jpg" width="1440" height="1800" alt="" />
+      </div>
+
+      <div
+        class="absolute -top-[42.375rem] left-1/2 w-[78rem] aspect-square border border-n-2/5 rounded-full -translate-x-1/2 md:-top-[38.5rem] xl:-top-[32rem] pointer-events-none"
+      >
+        <div
+          class="absolute top-1/2 left-1/2 w-[65.875rem] aspect-square border border-n-2/10 rounded-full -translate-x-1/2 -translate-y-1/2"
+        >
+        </div>
+        <div
+          class="absolute top-1/2 left-1/2 w-[51.375rem] aspect-square border border-n-2/10 rounded-full -translate-x-1/2 -translate-y-1/2"
+        >
+        </div>
+        <div
+          class="absolute top-1/2 left-1/2 w-[36.125rem] aspect-square border border-n-2/10 rounded-full -translate-x-1/2 -translate-y-1/2"
+        >
+        </div>
+        <div
+          class="absolute top-1/2 left-1/2 w-[23.125rem] aspect-square border border-n-2/10 rounded-full -translate-x-1/2 -translate-y-1/2"
+        >
+        </div>
+
+        <div class="absolute bottom-1/2 left-1/2 w-0.25 h-1/2 origin-bottom rotate-[46deg]">
+          <div class="w-2 h-2 -ml-1 -mt-36 bg-gradient-to-b from-[#DD734F] to-[#1A1A32] rounded-full orb-float"></div>
+        </div>
+        <div class="absolute bottom-1/2 left-1/2 w-0.25 h-1/2 origin-bottom -rotate-[56deg]">
+          <div class="w-4 h-4 -ml-1 -mt-32 bg-gradient-to-b from-[#DD734F] to-[#1A1A32] rounded-full orb-float-delayed"></div>
+        </div>
+        <div class="absolute bottom-1/2 left-1/2 w-0.25 h-1/2 origin-bottom rotate-[54deg]">
+          <div class="hidden w-4 h-4 -ml-1 mt-[12.9rem] bg-gradient-to-b from-[#B9AEDF] to-[#1A1A32] rounded-full xl:block orb-float"></div>
+        </div>
+        <div class="absolute bottom-1/2 left-1/2 w-0.25 h-1/2 origin-bottom -rotate-[65deg]">
+          <div class="w-3 h-3 -ml-1.5 mt-52 bg-gradient-to-b from-[#B9AEDF] to-[#1A1A32] rounded-full orb-float-delayed"></div>
+        </div>
+        <div class="absolute bottom-1/2 left-1/2 w-0.25 h-1/2 origin-bottom -rotate-[85deg]">
+          <div class="w-6 h-6 -ml-3 -mt-3 bg-gradient-to-b from-[#88E5BE] to-[#1A1A32] rounded-full orb-float"></div>
+        </div>
+        <div class="absolute bottom-1/2 left-1/2 w-0.25 h-1/2 origin-bottom rotate-[70deg]">
+          <div class="w-6 h-6 -ml-3 -mt-3 bg-gradient-to-b from-[#88E5BE] to-[#1A1A32] rounded-full orb-float-delayed"></div>
+        </div>
+      </div>
+    </div>
+
+    {/* Stat strip — replaces the template's client logo row */}
+    <div class="hidden relative z-10 mt-20 lg:block">
+      <h5 class="tagline mb-6 text-center text-n-1/50">The farm never sleeps</h5>
+      <ul class="flex">
+        {
+          stats.map((stat) => (
+            <li class="flex flex-col items-center justify-center flex-1 h-[8.5rem]">
+              <div class="h3 font-semibold">{stat.value}</div>
+              <div class="tagline mt-2 text-n-4">{stat.label}</div>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </div>
+
+  <div class="hidden absolute top-[55.25rem] left-10 right-10 h-0.25 bg-n-6 pointer-events-none xl:block"></div>
+</Section>
