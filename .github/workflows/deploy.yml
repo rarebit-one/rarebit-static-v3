@@ -20,8 +20,11 @@ permissions:
   actions: read
   # deployments: write must be granted here so the reusable tracker — which
   # declares an `environment:` — can be granted it in turn (a called workflow's
-  # token is capped by the caller's permissions).
+  # token is capped by the caller's permissions). Likewise pull-requests: write,
+  # which the tracker needs for its merged-PR status comment — omitting it here
+  # makes the reusable-workflow call fail at startup.
   deployments: write
+  pull-requests: write
 
 concurrency:
   group: deploy-production
