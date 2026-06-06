@@ -29,7 +29,8 @@ npm run preview  # serve dist/
   (`.h1`–`.h6`, `.body-1/2`, `.tagline`, `.button`), and section chrome (crosses, side rails,
   conic-gradient borders) are ported 1:1 from the v1 Tailwind 3 config into `global.css`
   `@theme`/`@layer components`. **Don't re-tint the chrome toward the brand magenta/cyan** —
-  brand color arrives via imagery only (`public/images/rarebit/`: logo + dashboard art).
+  brand color arrives via imagery only (`public/images/rarebit/`: logo + cinematic brand art —
+  city, operator, torii).
 - **Copy centers on the AI automation farm** — AI adoption work, workflow automation, agents with
   humans in the loop. **Never name clients.** Brand voice from `docs/brand-guide.png`: taglines
   like "Small Teams. Impossible Things." / "Human Creativity. Amplified."

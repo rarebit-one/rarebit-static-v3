@@ -27,5 +27,5 @@ npm run preview  # serve the build locally
 | `src/data/site.ts` | All page content: nav, stats, benefits, roadmap, contact |
 | `src/components/` | Ported Brainwave primitives (Section, Button, Heading, …) |
 | `src/components/sections/` | Home page sections (Hero, Benefits, Operations, …) |
-| `public/images/rarebit/` | Brand assets — logo + dashboard imagery |
+| `public/images/rarebit/` | Brand assets — logo + cinematic brand art |
 | `docs/brand-guide.png` | Rarebit One brand guide (colors, type, taglines) |
