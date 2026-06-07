@@ -12,9 +12,11 @@ import { benefits } from "../../data/site";
       text="The automations on our own farm — the same ones we bring to every AI adoption engagement."
     />
 
-    {/* Scroll-snap carousel — the CSS stand-in for the template's Splide */}
+    {/* Scroll-snap carousel — the CSS stand-in for the template's Splide.
+        Bleeds past the container on mobile (both edges) and to the right
+        viewport edge on md+, like the template's splide-visible overflow. */}
     <div
-      class="flex gap-6 overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar -mx-5 px-5 scroll-px-5 md:mx-0 md:px-0 md:scroll-px-0"
+      class="flex gap-6 overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar -ml-5 pl-5 -mr-5 pr-5 scroll-px-5 md:ml-0 md:pl-0 md:mr-[calc(50%-50vw)] md:pr-0 md:scroll-px-0 md:cursor-grab"
       data-benefits-track
     >
       {
@@ -61,7 +63,7 @@ import { benefits } from "../../data/site";
       {
         benefits.map((item, index) => (
           <button
-            class="relative w-6 h-6 mx-2"
+            class="relative w-6 h-6 mx-2 cursor-pointer"
             data-benefits-dot
             aria-label={`Go to ${item.title}`}
             aria-current={index === 0 ? "true" : "false"}
@@ -110,14 +112,61 @@ import { benefits } from "../../data/site";
       });
     };
 
+    const nearestSlide = () =>
+      slides.reduce(
+        (best, _slide, index) =>
+          Math.abs(slideLeft(index) - track.scrollLeft) <
+          Math.abs(slideLeft(best) - track.scrollLeft)
+            ? index
+            : best,
+        0
+      );
+
+    // The furthest snap position the track can actually rest on — slides
+    // near the end can't be left-aligned once the remaining content is
+    // narrower than the viewport.
+    const clampToSnap = (left: number) => {
+      const max = track.scrollWidth - track.clientWidth;
+      return slides.reduce(
+        (best, _slide, index) =>
+          slideLeft(index) <= Math.min(left, max) ? slideLeft(index) : best,
+        0
+      );
+    };
+
+    // Programmatic glides suspend snapping: Chromium cancels smooth
+    // scrollTo() on a mandatory-snap container, so snap is turned off for
+    // the animation and restored once scroll events go quiet. Targets are
+    // pre-clamped to a real snap position so the restore never yanks the
+    // track. While a glide runs the scroll handler must not recompute the
+    // active dot (a clamped end-target would override the user's choice).
+    let gliding = false;
+    let glideSettleTimer = 0;
+
+    const armGlideSettle = () => {
+      clearTimeout(glideSettleTimer);
+      glideSettleTimer = window.setTimeout(() => {
+        gliding = false;
+        track.style.scrollSnapType = "";
+      }, 200);
+    };
+
+    const glideTo = (left: number) => {
+      gliding = true;
+      track.style.scrollSnapType = "none";
+      track.scrollTo({
+        left,
+        behavior: reduceMotion.matches ? "auto" : "smooth",
+      });
+      armGlideSettle();
+    };
+
     dots.forEach((dot, index) => {
       dot.addEventListener("click", () => {
+        setActive(index);
         // Scroll the track directly (not scrollIntoView) so the page never
         // moves vertically when a dot is tapped.
-        track.scrollTo({
-          left: slideLeft(index),
-          behavior: reduceMotion.matches ? "auto" : "smooth",
-        });
+        glideTo(clampToSnap(slideLeft(index)));
       });
     });
 
@@ -125,20 +174,59 @@ import { benefits } from "../../data/site";
     track.addEventListener(
       "scroll",
       () => {
+        if (gliding) {
+          armGlideSettle();
+          return;
+        }
         cancelAnimationFrame(raf);
-        raf = requestAnimationFrame(() => {
-          const nearest = slides.reduce(
-            (best, _slide, index) =>
-              Math.abs(slideLeft(index) - track.scrollLeft) <
-              Math.abs(slideLeft(best) - track.scrollLeft)
-                ? index
-                : best,
-            0
-          );
-          setActive(nearest);
-        });
+        raf = requestAnimationFrame(() => setActive(nearestSlide()));
       },
       { passive: true }
     );
+
+    // Mouse drag-to-scroll (Splide-style). Touch devices scroll natively.
+    // A drag only commits after a few px of movement (so plain clicks do
+    // nothing); while it runs, snapping and text selection are suspended,
+    // then the track glides to the nearest slide on release.
+    let dragPending = false;
+    let dragging = false;
+    let dragStartX = 0;
+    let dragStartScroll = 0;
+
+    track.addEventListener("pointerdown", (event) => {
+      if (event.pointerType !== "mouse" || event.button !== 0) return;
+      dragPending = true;
+      dragStartX = event.clientX;
+      dragStartScroll = track.scrollLeft;
+    });
+
+    window.addEventListener("pointermove", (event) => {
+      if (!dragPending && !dragging) return;
+      const dx = event.clientX - dragStartX;
+      if (!dragging) {
+        if (Math.abs(dx) < 4) return;
+        dragging = true;
+        track.style.scrollSnapType = "none";
+        track.style.cursor = "grabbing";
+        track.style.userSelect = "none";
+      }
+      track.scrollLeft = dragStartScroll - dx;
+    });
+
+    const endDrag = () => {
+      dragPending = false;
+      if (!dragging) return;
+      dragging = false;
+      track.style.cursor = "";
+      track.style.userSelect = "";
+      const nearest = nearestSlide();
+      setActive(nearest);
+      glideTo(clampToSnap(slideLeft(nearest)));
+    };
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointercancel", endDrag);
+
+    // Keep native image drag from hijacking the gesture.
+    track.addEventListener("dragstart", (event) => event.preventDefault());
   }
 </script>

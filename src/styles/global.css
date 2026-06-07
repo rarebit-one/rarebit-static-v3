@@ -3,10 +3,15 @@
 /*
  * Brainwave (UI8) design system, ported from the v1 Tailwind 3 config
  * to Tailwind 4 CSS-first @theme tokens. Palette and type scale are
- * verbatim from the template — don't re-tint; brand color arrives via
- * imagery (logo, dashboards), not the chrome.
+ * verbatim from the template. Brand accents (docs/brand-guide.png) are
+ * layered on top: magenta for interactive states (links, hovers), cyan
+ * for code/identifiers and markers. Structural chrome (crosses, side
+ * rails, conic borders) stays template-neutral.
  */
 @theme {
+  --color-brand-magenta: #ff0f8a;
+  --color-brand-cyan: #00e8ff;
+
   --color-color-1: #ac6aff;
   --color-color-2: #ffc876;
   --color-color-3: #ff776f;
@@ -58,10 +63,26 @@
   }
 }
 
-@layer components {
-  .container {
-    @apply max-w-[77.5rem] mx-auto px-5 md:px-10 lg:px-15 xl:max-w-[87.5rem];
+/* Brainwave's container, declared as a utility so it REPLACES Tailwind 4's
+   core `container` utility — as a @layer components rule the core utility
+   (utilities layer) would override the max-widths with breakpoint defaults. */
+@utility container {
+  width: 100%;
+  max-width: 77.5rem;
+  margin-inline: auto;
+  padding-inline: calc(var(--spacing) * 5);
+  @media (width >= 48rem) {
+    padding-inline: calc(var(--spacing) * 10);
   }
+  @media (width >= 64rem) {
+    padding-inline: calc(var(--spacing) * 15);
+  }
+  @media (width >= 80rem) {
+    max-width: 87.5rem;
+  }
+}
+
+@layer components {
   .h1 {
     @apply font-semibold text-[2.5rem] leading-[3.25rem] md:text-[2.75rem] md:leading-[3.75rem] lg:text-[3.25rem] lg:leading-[4.0625rem] xl:text-[3.75rem] xl:leading-[4.5rem];
   }

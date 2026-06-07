@@ -5,7 +5,7 @@ import { navigation, site } from "../data/site";
 ---
 
 <header
-  class="fixed top-0 left-0 z-50 w-full bg-n-8/90 backdrop-blur-sm border-b border-n-6"
+  class="fixed top-0 left-0 z-50 w-full bg-n-8/90 backdrop-blur-sm border-b border-n-6 lg:bg-n-8/90 lg:backdrop-blur-sm"
   data-header
 >
   <div class="flex items-center h-[4.75rem] px-5 lg:h-[5.25rem] lg:px-7.5 xl:px-10">
@@ -19,7 +19,7 @@ import { navigation, site } from "../data/site";
         {
           navigation.map((item) => (
             <a
-              class={`block relative font-code text-2xl uppercase text-n-1 transition-colors hover:text-color-1 ${
+              class={`block relative font-code text-2xl uppercase text-n-1 transition-colors hover:text-brand-magenta ${
                 item.onlyMobile ? "lg:hidden" : ""
               } px-6 py-6 md:py-8 lg:-mr-0.25 lg:text-xs lg:font-semibold lg:text-n-1/50 lg:leading-5 lg:hover:text-n-1 xl:px-12`}
               href={item.url}
@@ -80,7 +80,9 @@ import { navigation, site } from "../data/site";
     >
       GitHub
     </a>
-    <Button class="hidden lg:flex" href="/connect">Connect</Button>
+    {/* max-lg:hidden (not `hidden lg:flex`): Tailwind 4 sorts .inline-flex
+        after .hidden, so the Button's base inline-flex would win on mobile */}
+    <Button class="max-lg:hidden" href="/connect">Connect</Button>
 
     <Button class="ml-auto lg:hidden" px="px-3" data-nav-toggle>
       <svg class="overflow-visible" width="20" height="12" viewBox="0 0 20 12">
@@ -105,7 +107,12 @@ import { navigation, site } from "../data/site";
     open = next;
     nav?.classList.toggle("hidden", !open);
     nav?.classList.toggle("flex", open);
+    // Swap (not stack) the header surface like the template: solid when the
+    // menu is open, translucent + blur when closed. The lg: variants on the
+    // header keep desktop translucent either way.
     header?.classList.toggle("bg-n-8", open);
+    header?.classList.toggle("bg-n-8/90", !open);
+    header?.classList.toggle("backdrop-blur-sm", !open);
     document.body.classList.toggle("overflow-hidden", open);
     topBar?.setAttribute("y", open ? "5" : "0");
     topBar?.setAttribute("transform", open ? "rotate(45)" : "rotate(0)");
