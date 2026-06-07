@@ -62,29 +62,9 @@ If the user wants to explore working together, call the intake_questionnaire
 tool and walk them through it conversationally, then submit with
 submit_inquiry.`;
 
-const OPEN_SOURCE = `# Rarebit open source
-
-The primitives the farm runs on, released as focused Ruby gems.
-All at https://github.com/rarebit-one/<repo>.
-
-## Authentication & Identity (Ruby / Rails 8)
-- **standard_id** — comprehensive authentication engine: OAuth 2.0/OIDC with
-  PKCE, passwordless email & SMS OTP, dual web/API engines, STI sessions, and
-  social sign-in (Google, Apple) via opt-in provider plugins.
-- **standard_singpass** — Singpass MyInfo (FAPI 2.0) client: PKCE, DPoP,
-  private_key_jwt, ECDH-ES JWE decryption, 40+ field person-data parser.
-
-## Reliability & Observability (Ruby / Rails)
-- **standard_circuit** — circuit-breaker primitives on stoplight, with Stripe/
-  AWS/Faraday/SMTP adapter bundles and Sentry/metrics subscribers.
-- **standard_health** — drop-in /health/alive, /health/ready, and env-spec
-  auditing for Rails 8.
-- **standard_audit** — database-backed audit logging via Rails events, with
-  GDPR anonymization and sensitive-key stripping.
-
-## Data Patterns (Ruby / Rails)
-- **standard_ledger** — immutable journal entries with declarative aggregate
-  projections (inline, async, sql, matview, trigger) and deterministic replay.`;
+// BEGIN GENERATED: open_source canned content — edit src/data/openSource.data.mjs, then `npm run sync:mcp`
+const OPEN_SOURCE = "# Rarebit open source\n\nThe primitives the farm runs on, released as focused Ruby gems.\nAll at https://github.com/rarebit-one/<repo>.\n\n## Authentication & Identity (Ruby / Rails 8)\n- **standard_id** — comprehensive authentication engine: OAuth 2.0/OIDC with PKCE, passwordless email & SMS OTP, dual web/API engines, STI sessions, and social sign-in (Google, Apple) via opt-in provider plugins.\n- **standard_singpass** — Singpass MyInfo (FAPI 2.0) client: PKCE, DPoP, private_key_jwt, ECDH-ES JWE decryption, 40+ field person-data parser.\n\n## Reliability & Observability (Ruby / Rails)\n- **standard_circuit** — circuit-breaker primitives on stoplight, with Stripe/AWS/Faraday/SMTP adapter bundles and Sentry/metrics subscribers.\n- **standard_health** — drop-in /health/alive, /health/ready, and env-spec auditing for Rails 8.\n- **standard_audit** — database-backed audit logging via Rails events, with GDPR anonymization and sensitive-key stripping.\n\n## Data Patterns (Ruby / Rails)\n- **standard_ledger** — immutable journal entries with declarative aggregate projections (inline, async, sql, matview, trigger) and deterministic replay.";
+// END GENERATED: open_source canned content
 
 const QUESTIONNAIRE = {
   instructions:

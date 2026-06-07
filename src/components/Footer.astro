@@ -2,6 +2,7 @@
 import Section from "./Section.astro";
 import Logo from "./Logo.astro";
 import { navigation, site, legal } from "../data/site";
+import { buildStamp } from "../lib/farm";
 
 const year = new Date().getFullYear();
 ---
@@ -30,6 +31,7 @@ const year = new Date().getFullYear();
     <div class="caption text-n-4 mb-6 text-center lg:mb-0 lg:text-left">
       <div>© {year} {legal.name} (UEN {legal.uen})</div>
       <div class="mt-1 text-n-4/70">{legal.address}</div>
+      <div class="mt-1 text-n-4/70">Built by the farm · {buildStamp()}</div>
     </div>
     <div class="flex justify-center gap-8">
       <a

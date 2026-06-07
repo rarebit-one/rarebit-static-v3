@@ -42,9 +42,18 @@ npm run preview  # serve dist/
   humans in the loop. **Never name clients.** Brand voice from `docs/brand-guide.png`: taglines
   like "Small Teams. Impossible Things." / "Human Creativity. Amplified."
 - **Content lives in `src/data/site.ts`** (nav, stats, benefits, collaboration, roadmap, contact)
-  and `src/data/openSource.ts` (the /open-source catalog — descriptions are verbatim from v2's
-  source-of-truth copy; keep them in sync with the gem READMEs when versions bump).
-  Stats are playful fakes ("Managers: 0") — keep them obviously tongue-in-cheek, not claims.
+  and `src/data/openSource.data.mjs` (the /open-source catalog — plain JS so scripts can import
+  it; `openSource.ts` is its typed wrapper; descriptions verbatim from v2's source-of-truth
+  copy). The MCP server's `open_source` canned content is **generated** from the catalog via
+  `npm run sync:mcp` (markers in `functions/.../server/index.mjs`; CI fails on drift) — edit
+  the data, never the generated block.
+- **Build-time farm data** (`src/lib/farm.ts`): hero stats, Operations receipts, gem
+  versions/downloads, and the footer stamp are fetched from public GitHub/RubyGems APIs at
+  build, memoized per process, with static fallbacks — a flaky API must never break the build,
+  and the stats strip falls back to the all-playful set rather than mixing real labels with
+  fake numbers ("Managers: 0" stays obviously tongue-in-cheek). `weekly-rebuild.yml` forces a
+  DO rebuild Mondays 06:00 SGT to keep the numbers fresh; `site-quality.yml` runs link checks
+  (blocking) and Lighthouse (advisory) on PRs.
 - **Legal footer** (name, UEN, registered address) mirrors `rarebit-ops` `entity/profile.yml` —
   that file is the source of truth; update here when ACRA details change.
 - **Contact is MCP-first, form-fallback.** All CTAs route to `/connect`, which documents the

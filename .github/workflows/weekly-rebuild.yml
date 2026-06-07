@@ -1,0 +1,26 @@
+name: Weekly rebuild
+
+# The hero stats, Operations receipts, and gem versions are fetched at build
+# time — a weekly forced rebuild keeps them fresh between code pushes.
+# Mondays 06:00 SGT (22:00 UTC Sunday).
+
+on:
+  schedule:
+    - cron: "0 22 * * 0"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger DO App Platform deployment
+        run: |
+          curl -sf -X POST \
+            -H "Authorization: Bearer ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"force_build": true}' \
+            "https://api.digitalocean.com/v2/apps/ca13ba74-9817-4286-86e9-21eda91e05c2/deployments" \
+            > /dev/null
