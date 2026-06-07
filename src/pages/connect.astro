@@ -204,7 +204,7 @@ const tools = [
             </div>
           </form>
 
-          <p class="body-2 hidden text-n-2" data-inquiry-success>
+          <p class="body-2 hidden text-n-2" data-inquiry-success role="status">
             Inquiry received — thank you! We read every submission and will reply by email
             within two working days.
           </p>
@@ -239,7 +239,11 @@ const tools = [
       const response = await fetch("/inquiry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(Object.fromEntries(new FormData(form))),
+        body: JSON.stringify({
+          ...Object.fromEntries(new FormData(form)),
+          // Speed-gate input: ms since page render (see inquiry/index.mjs).
+          elapsed: Math.round(performance.now()),
+        }),
       });
       const payload = await response.json().catch(() => ({}));
       if (response.ok && payload.ok) {

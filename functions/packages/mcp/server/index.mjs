@@ -259,22 +259,29 @@ async function callTool(name, args) {
     case "intake_questionnaire":
       return text(JSON.stringify(QUESTIONNAIRE, null, 2));
     case "submit_inquiry": {
-      const { name: who, email, company, summary, answers } = args ?? {};
-      if (typeof who !== "string" || !who.trim()) return toolError("name is required");
-      if (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      // Clean first, validate the cleaned values — what's validated is
+      // exactly what lands in the issue (truncation can't produce an
+      // unvalidated value).
+      const who = clean(args?.name, 200);
+      const email = clean(args?.email, 200);
+      const company = clean(args?.company, 200);
+      const summary = clean(args?.summary, 4000);
+
+      if (!who) return toolError("name is required");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return toolError("a valid email is required");
       }
-      if (typeof summary !== "string" || !summary.trim()) return toolError("summary is required");
+      if (!summary) return toolError("summary is required");
 
       const id = `${new Date().toISOString().slice(0, 10)}-${randomUUID().slice(0, 8)}`;
       try {
         await createInquiryIssue({
           id,
-          who: clean(who, 200),
-          email: clean(email, 200),
-          company: typeof company === "string" ? clean(company, 200) : undefined,
-          summary: clean(summary, 4000),
-          answers,
+          who,
+          email,
+          company: company || undefined,
+          summary,
+          answers: args?.answers,
         });
       } catch (error) {
         return toolError(
@@ -283,7 +290,7 @@ async function callTool(name, args) {
         );
       }
       return text(
-        `Inquiry ${id} received — thank you! We read every submission and will reply to ${email.trim()} ` +
+        `Inquiry ${id} received — thank you! We read every submission and will reply to ${email} ` +
           "within two working days."
       );
     }

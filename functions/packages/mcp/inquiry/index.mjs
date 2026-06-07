@@ -82,21 +82,35 @@ export async function main(event) {
     return respond(400, { error: "invalid JSON" });
   }
 
-  const { name, email, company, message, website } = payload ?? {};
-
   // Honeypot: real users never fill the hidden "website" field. Pretend
   // success so bots don't learn anything.
-  if (typeof website === "string" && website.trim() !== "") {
+  if (typeof payload?.website === "string" && payload.website.trim() !== "") {
     return respond(200, { ok: true });
   }
 
-  if (typeof name !== "string" || !name.trim()) {
+  // Speed gate: the form reports ms elapsed since page render. Submissions
+  // faster than a human could plausibly type (or without the field) are
+  // bot-shaped — same silent accept as the honeypot. Elapsed time (not
+  // wall-clock timestamps) avoids client clock-skew false positives.
+  const elapsed = Number(payload?.elapsed);
+  if (!Number.isFinite(elapsed) || elapsed < 3000) {
+    return respond(200, { ok: true });
+  }
+
+  // Clean first, validate the cleaned values — what's validated is exactly
+  // what lands in the issue (truncation can't produce an unvalidated value).
+  const who = clean(payload?.name, 200);
+  const email = clean(payload?.email, 200);
+  const company = clean(payload?.company, 200);
+  const message = clean(payload?.message, 4000);
+
+  if (!who) {
     return respond(422, { error: "name is required" });
   }
-  if (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return respond(422, { error: "a valid email is required" });
   }
-  if (typeof message !== "string" || !message.trim()) {
+  if (!message) {
     return respond(422, { error: "message is required" });
   }
 
@@ -104,10 +118,10 @@ export async function main(event) {
   try {
     await createInquiryIssue({
       id,
-      who: clean(name, 200),
-      email: clean(email, 200),
-      company: typeof company === "string" && company.trim() ? clean(company, 200) : undefined,
-      message: clean(message, 4000),
+      who,
+      email,
+      company: company || undefined,
+      message,
     });
   } catch {
     return respond(502, {
