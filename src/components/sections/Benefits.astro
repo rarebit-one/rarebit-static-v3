@@ -184,31 +184,41 @@ import { benefits } from "../../data/site";
       { passive: true }
     );
 
-    // Mouse drag-to-scroll (Splide-style). Touch devices scroll natively;
-    // snap is suspended while the track follows the pointer, then restored
-    // with a glide to the nearest slide.
+    // Mouse drag-to-scroll (Splide-style). Touch devices scroll natively.
+    // A drag only commits after a few px of movement (so plain clicks do
+    // nothing); while it runs, snapping and text selection are suspended,
+    // then the track glides to the nearest slide on release.
+    let dragPending = false;
     let dragging = false;
     let dragStartX = 0;
     let dragStartScroll = 0;
 
     track.addEventListener("pointerdown", (event) => {
       if (event.pointerType !== "mouse" || event.button !== 0) return;
-      dragging = true;
+      dragPending = true;
       dragStartX = event.clientX;
       dragStartScroll = track.scrollLeft;
-      track.style.scrollSnapType = "none";
-      track.style.cursor = "grabbing";
     });
 
     window.addEventListener("pointermove", (event) => {
-      if (!dragging) return;
-      track.scrollLeft = dragStartScroll - (event.clientX - dragStartX);
+      if (!dragPending && !dragging) return;
+      const dx = event.clientX - dragStartX;
+      if (!dragging) {
+        if (Math.abs(dx) < 4) return;
+        dragging = true;
+        track.style.scrollSnapType = "none";
+        track.style.cursor = "grabbing";
+        track.style.userSelect = "none";
+      }
+      track.scrollLeft = dragStartScroll - dx;
     });
 
     const endDrag = () => {
+      dragPending = false;
       if (!dragging) return;
       dragging = false;
       track.style.cursor = "";
+      track.style.userSelect = "";
       const nearest = nearestSlide();
       setActive(nearest);
       glideTo(clampToSnap(slideLeft(nearest)));
