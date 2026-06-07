@@ -91,10 +91,10 @@ const tools = [
           <div class="flex items-center justify-between gap-4 px-4 py-4 bg-n-8 rounded-[0.875rem] flex-wrap md:px-6 md:py-5">
             <div class="min-w-0">
               <div class="tagline mb-1 text-n-4">MCP endpoint · Streamable HTTP</div>
-              <code class="font-code text-sm text-n-1 break-all md:text-base">{endpoint}</code>
+              <code class="font-code text-sm text-brand-cyan break-all md:text-base">{endpoint}</code>
             </div>
             <button
-              class="button px-4 py-2 border border-n-1/15 rounded-lg text-n-1 transition-colors hover:text-color-1 hover:border-n-1/30"
+              class="button px-4 py-2 border border-n-1/15 rounded-lg text-n-1 cursor-pointer transition-colors hover:text-brand-magenta hover:border-brand-magenta/40"
               data-copy={endpoint}
             >
               Copy
@@ -106,13 +106,13 @@ const tools = [
       <div class="grid gap-5 lg:grid-cols-2 mb-15">
         {
           clients.map((client) => (
-            <div class="flex flex-col min-w-0 p-5 border border-n-1/10 rounded-3xl bg-n-7 md:p-8">
+            <div class="flex flex-col min-w-0 p-5 border border-n-1/10 rounded-3xl bg-n-7 transition-colors hover:border-brand-cyan/30 md:p-8">
               <h5 class="h6 mb-2">{client.title}</h5>
               <p class="body-2 mb-4 text-n-4">{client.instructions}</p>
               <div class="relative mt-auto">
                 <pre class="p-4 pr-14 bg-n-8 rounded-xl font-code text-xs leading-5 text-n-2 overflow-x-auto md:text-sm md:leading-6"><code>{client.snippet}</code></pre>
                 <button
-                  class="button absolute top-3 right-3 px-2 py-1 text-n-4 transition-colors hover:text-n-1"
+                  class="button absolute top-3 right-3 px-2 py-1 text-n-4 cursor-pointer transition-colors hover:text-brand-magenta"
                   data-copy={client.snippet}
                   aria-label={`Copy ${client.title} setup`}
                 >
@@ -129,7 +129,7 @@ const tools = [
             {
               tools.map((tool) => (
                 <li class="py-3 border-t border-n-6 first:border-t-0">
-                  <code class="font-code text-sm text-color-1">{tool.name}</code>
+                  <code class="font-code text-sm text-brand-cyan">{tool.name}</code>
                   <p class="mt-1 text-n-4">{tool.text}</p>
                 </li>
               ))
@@ -139,7 +139,7 @@ const tools = [
       </div>
 
       <p class="body-2 text-center text-n-4">
-        Prefer plain email? <a class="text-n-1 transition-colors hover:text-color-1" href={`mailto:${site.email}`}>{site.email}</a>
+        Prefer plain email? <a class="text-n-1 transition-colors hover:text-brand-magenta" href={`mailto:${site.email}`}>{site.email}</a>
       </p>
     </div>
   </Section>
