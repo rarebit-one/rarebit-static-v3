@@ -95,48 +95,50 @@ import { benefits } from "../../data/site";
   const dots = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-benefits-dot]"));
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-  // offsetLeft is measured from the offsetParent (the container), not the
-  // track's scroll origin — subtract the first slide's offset so positions
-  // are comparable with scrollLeft.
-  const slideLeft = (index: number) => slides[index].offsetLeft - slides[0].offsetLeft;
+  if (track && slides.length > 0) {
+    // offsetLeft is measured from the offsetParent (the container), not the
+    // track's scroll origin — subtract the first slide's offset so positions
+    // are comparable with scrollLeft.
+    const slideLeft = (index: number) => slides[index].offsetLeft - slides[0].offsetLeft;
 
-  const setActive = (active: number) => {
+    const setActive = (active: number) => {
+      dots.forEach((dot, index) => {
+        const isActive = index === active;
+        dot.setAttribute("aria-current", isActive ? "true" : "false");
+        dot.firstElementChild?.classList.toggle("opacity-100", isActive);
+        dot.firstElementChild?.classList.toggle("opacity-0", !isActive);
+      });
+    };
+
     dots.forEach((dot, index) => {
-      const isActive = index === active;
-      dot.setAttribute("aria-current", isActive ? "true" : "false");
-      dot.firstElementChild?.classList.toggle("opacity-100", isActive);
-      dot.firstElementChild?.classList.toggle("opacity-0", !isActive);
-    });
-  };
-
-  dots.forEach((dot, index) => {
-    dot.addEventListener("click", () => {
-      // Scroll the track directly (not scrollIntoView) so the page never
-      // moves vertically when a dot is tapped.
-      track?.scrollTo({
-        left: slideLeft(index),
-        behavior: reduceMotion.matches ? "auto" : "smooth",
+      dot.addEventListener("click", () => {
+        // Scroll the track directly (not scrollIntoView) so the page never
+        // moves vertically when a dot is tapped.
+        track.scrollTo({
+          left: slideLeft(index),
+          behavior: reduceMotion.matches ? "auto" : "smooth",
+        });
       });
     });
-  });
 
-  let raf = 0;
-  track?.addEventListener(
-    "scroll",
-    () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const nearest = slides.reduce(
-          (best, _slide, index) =>
-            Math.abs(slideLeft(index) - track.scrollLeft) <
-            Math.abs(slideLeft(best) - track.scrollLeft)
-              ? index
-              : best,
-          0
-        );
-        setActive(nearest);
-      });
-    },
-    { passive: true }
-  );
+    let raf = 0;
+    track.addEventListener(
+      "scroll",
+      () => {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(() => {
+          const nearest = slides.reduce(
+            (best, _slide, index) =>
+              Math.abs(slideLeft(index) - track.scrollLeft) <
+              Math.abs(slideLeft(best) - track.scrollLeft)
+                ? index
+                : best,
+            0
+          );
+          setActive(nearest);
+        });
+      },
+      { passive: true }
+    );
+  }
 </script>
