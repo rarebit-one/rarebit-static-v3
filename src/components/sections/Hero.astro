@@ -13,10 +13,10 @@ const [prCount, downloads] = await Promise.all([mergedPrCount(30), totalGemDownl
 const live = prCount !== null && downloads !== null;
 const farmStats = live
   ? [
-      { id: "0", label: "PRs merged · 30 days", value: prCount.toLocaleString("en-SG") },
-      { id: "1", label: "Gem downloads", value: compactNumber(downloads) },
-      { id: "2", label: "Open-source gems", value: String(gems.length) },
-      { id: "3", label: "Managers", value: "0" },
+      { label: "PRs merged · 30 days", value: prCount.toLocaleString("en-SG") },
+      { label: "Gem downloads", value: compactNumber(downloads) },
+      { label: "Open-source gems", value: String(gems.length) },
+      { label: "Managers", value: "0" },
     ]
   : stats;
 ---

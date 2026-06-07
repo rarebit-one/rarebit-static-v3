@@ -55,6 +55,9 @@ export type Merge = {
 /** Most recently merged PRs across the org's public repos. */
 export function recentMerges(limit = 3): Promise<Merge[] | null> {
   return memoized(`merges:${limit}`, async () => {
+    // The search API can't sort by merge time, only `updated` — fetch a
+    // wider window and re-sort by merged_at so a stale-but-recently-touched
+    // PR can't outrank an actual recent merge.
     const query = encodeURIComponent(`org:${ORG} is:pr is:merged`);
     const data = await fetchJson<{
       items?: Array<{
@@ -66,17 +69,20 @@ export function recentMerges(limit = 3): Promise<Merge[] | null> {
         pull_request?: { merged_at?: string };
       }>;
     }>(
-      `https://api.github.com/search/issues?q=${query}&sort=updated&order=desc&per_page=${limit}`,
+      `https://api.github.com/search/issues?q=${query}&sort=updated&order=desc&per_page=${Math.max(limit * 3, 10)}`,
       GITHUB_ACCEPT
     );
     if (!Array.isArray(data?.items) || data.items.length === 0) return null;
-    return data.items.slice(0, limit).map((item) => ({
-      repo: String(item.repository_url ?? "").split("/").pop() ?? "",
-      number: item.number ?? 0,
-      title: String(item.title ?? "").slice(0, 90),
-      mergedAt: item.pull_request?.merged_at ?? item.closed_at ?? "",
-      url: item.html_url ?? `https://github.com/${ORG}`,
-    }));
+    return data.items
+      .map((item) => ({
+        repo: String(item.repository_url ?? "").split("/").pop() ?? "",
+        number: item.number ?? 0,
+        title: String(item.title ?? "").slice(0, 90),
+        mergedAt: item.pull_request?.merged_at ?? item.closed_at ?? "",
+        url: item.html_url ?? `https://github.com/${ORG}`,
+      }))
+      .sort((a, b) => b.mergedAt.localeCompare(a.mergedAt))
+      .slice(0, limit);
   });
 }
 
@@ -92,21 +98,28 @@ export function gemInfo(name: string): Promise<GemInfo | null> {
   });
 }
 
-/** Sum of downloads across gems; null when nothing could be fetched. */
+/** Sum of downloads across gems — all-or-nothing: a partial sum would be a
+ *  quietly under-counted "real" number, so any miss falls back entirely. */
 export async function totalGemDownloads(names: string[]): Promise<number | null> {
   const infos = await Promise.all(names.map((name) => gemInfo(name)));
-  const found = infos.filter((info): info is GemInfo => info !== null);
-  if (found.length === 0) return null;
-  return found.reduce((sum, info) => sum + info.downloads, 0);
+  if (infos.some((info) => info === null)) return null;
+  return (infos as GemInfo[]).reduce((sum, info) => sum + info.downloads, 0);
 }
 
 export const compactNumber = (value: number): string =>
   new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 
-export const shortDate = (iso: string): string =>
-  new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", timeZone: "Asia/Singapore" }).format(
-    new Date(iso)
-  );
+export const shortDate = (iso: string): string => {
+  const date = new Date(iso);
+  // Guard the build: format(Invalid Date) throws RangeError, and the input
+  // comes from the (un-try/catch'd) API mapping path.
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-SG", {
+    day: "numeric",
+    month: "short",
+    timeZone: "Asia/Singapore",
+  }).format(date);
+};
 
 /** The moment this build ran, in farm-local time. */
 export const buildStamp = (): string =>

@@ -17,6 +17,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Trigger DO App Platform deployment
+        # App ID = rarebit-static-v3 on App Platform (see .do/app.yaml)
         run: |
           curl -sf -X POST \
             -H "Authorization: Bearer ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}" \
