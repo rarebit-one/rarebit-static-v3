@@ -4,19 +4,31 @@
 # deploys on push to `main`. `.github/workflows/deploy.yml` then polls the DO
 # API to surface deploy status back in GitHub.
 #
-# Apply changes to the live app with:
-#   doctl apps update <APP_ID> --spec .do/app.yaml
+# ⚠️ NEVER apply this file raw — `doctl apps update --spec` is a FULL-SPEC
+# REPLACE, and this file deliberately omits the GITHUB_TOKEN secret (see
+# below). Applying it verbatim wipes the token and every subsequent deploy
+# fails at build (project.yml interpolates it). Dashboard env edits have the
+# inverse trap: they regenerate the spec from the last good deployment,
+# discarding spec changes that never went ACTIVE. Instead, merge into the
+# LIVE spec (which carries the secret as a round-trippable EV[...] value):
+#
+#   doctl apps spec get <APP_ID> > /tmp/live.yaml
+#   <edit /tmp/live.yaml to add your change>
+#   doctl apps update <APP_ID> --spec /tmp/live.yaml && rm /tmp/live.yaml
+#
+# ...then mirror the change into this file for version control.
 #
 # The rarebit.one domains were cut over from the retired rarebit-static-v2 app
 # (a domain can only be PRIMARY on one app at a time). The zone is DO-managed,
 # so App Platform maintains the DNS records itself.
 #
-# The `mcp` functions component serves https://rarebit.one/mcp (the ingress
-# rewrites /mcp → /mcp/server, i.e. package `mcp` / function `server` under
-# functions/). Its GITHUB_TOKEN env var (fine-grained PAT, Issues read/write on
-# GITHUB_REPO only — the inquiry inbox) is set on the live app only — never
-# commit it here; without it submit_inquiry degrades to an email-fallback
-# message.
+# The `mcp` functions component serves https://rarebit.one/mcp and
+# https://rarebit.one/inquiry (ingress rewrites to /mcp/server and
+# /mcp/inquiry — package `mcp`, functions `server` and `inquiry` under
+# functions/). The GITHUB_TOKEN env var (fine-grained PAT, Issues read/write
+# on GITHUB_REPO only — the inquiry inbox) is set on the live app only —
+# never commit it here; without it both inquiry paths degrade to an
+# email-fallback message.
 name: rarebit-static-v3
 region: sgp
 
