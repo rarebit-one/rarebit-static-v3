@@ -64,6 +64,7 @@ import { benefits } from "../../data/site";
             class="relative w-6 h-6 mx-2"
             data-benefits-dot
             aria-label={`Go to ${item.title}`}
+            aria-current={index === 0 ? "true" : "false"}
           >
             <span
               class={`absolute inset-0 bg-conic-gradient rounded-full transition-opacity ${
@@ -94,19 +95,27 @@ import { benefits } from "../../data/site";
   const dots = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-benefits-dot]"));
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
+  // offsetLeft is measured from the offsetParent (the container), not the
+  // track's scroll origin — subtract the first slide's offset so positions
+  // are comparable with scrollLeft.
+  const slideLeft = (index: number) => slides[index].offsetLeft - slides[0].offsetLeft;
+
   const setActive = (active: number) => {
     dots.forEach((dot, index) => {
-      dot.firstElementChild?.classList.toggle("opacity-100", index === active);
-      dot.firstElementChild?.classList.toggle("opacity-0", index !== active);
+      const isActive = index === active;
+      dot.setAttribute("aria-current", isActive ? "true" : "false");
+      dot.firstElementChild?.classList.toggle("opacity-100", isActive);
+      dot.firstElementChild?.classList.toggle("opacity-0", !isActive);
     });
   };
 
   dots.forEach((dot, index) => {
     dot.addEventListener("click", () => {
-      slides[index]?.scrollIntoView({
+      // Scroll the track directly (not scrollIntoView) so the page never
+      // moves vertically when a dot is tapped.
+      track?.scrollTo({
+        left: slideLeft(index),
         behavior: reduceMotion.matches ? "auto" : "smooth",
-        block: "nearest",
-        inline: "start",
       });
     });
   });
@@ -118,9 +127,9 @@ import { benefits } from "../../data/site";
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         const nearest = slides.reduce(
-          (best, slide, index) =>
-            Math.abs(slide.offsetLeft - track.scrollLeft) <
-            Math.abs(slides[best].offsetLeft - track.scrollLeft)
+          (best, _slide, index) =>
+            Math.abs(slideLeft(index) - track.scrollLeft) <
+            Math.abs(slideLeft(best) - track.scrollLeft)
               ? index
               : best,
           0
