@@ -5,8 +5,9 @@ import Generating from "../Generating.astro";
 import { recentMerges, shortDate } from "../../lib/farm";
 
 // Receipts: real merges across the org's public repos, fetched at build
-// time. Omitted entirely when the API doesn't answer.
-const merges = await recentMerges(3);
+// time. Omitted entirely when the API doesn't answer. Five rows so the
+// client-side live upgrade (up to 8) doesn't grow the section as sharply.
+const merges = await recentMerges(5);
 ---
 
 <Section id="operations">
@@ -321,10 +322,19 @@ const merges = await recentMerges(3);
       li.append(chip, link, time);
       list.append(li);
     }
+    // Track only the current window — `seen` exists to gate the entrance
+    // animation, not to remember history (it would grow for the tab's life).
+    seen.clear();
     items.forEach((item) => seen.add(item.id));
   };
 
+  // Single poll in flight — the interval and visibilitychange can otherwise
+  // race, double-spending the rate budget and double-rendering.
+  let inFlight = false;
+
   const poll = async () => {
+    if (inFlight) return;
+    inFlight = true;
     try {
       const response = await fetch(EVENTS_URL, {
         headers: {
@@ -373,6 +383,8 @@ const merges = await recentMerges(3);
       render();
     } catch {
       /* network blocked — the SSR receipts stay */
+    } finally {
+      inFlight = false;
     }
   };
 
