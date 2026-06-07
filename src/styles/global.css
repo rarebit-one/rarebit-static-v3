@@ -50,6 +50,14 @@
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
 }
 
+/* Scroll-snap carousel track — replaces the template's Splide */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @layer components {
   .container {
     @apply max-w-[77.5rem] mx-auto px-5 md:px-10 lg:px-15 xl:max-w-[87.5rem];
@@ -104,6 +112,30 @@ html {
   }
   .orb-float-delayed {
     animation: orb-float 7s ease-in-out 1.5s infinite;
+  }
+
+  /* Hero dot entrance — the template's mount transition (translate-y-10 →
+     0 + fade, 500ms ease-out). Uses `translate`/`opacity` so it composes
+     with orb-float's `transform`; the float is delayed until it lands. */
+  .dot-enter.orb-float {
+    animation:
+      dot-enter 0.5s ease-out backwards,
+      orb-float 6s ease-in-out 0.5s infinite;
+  }
+  .dot-enter.orb-float-delayed {
+    animation:
+      dot-enter 0.5s ease-out backwards,
+      orb-float 7s ease-in-out 2s infinite;
+  }
+  @keyframes dot-enter {
+    from {
+      translate: 0 2.5rem;
+      opacity: 0;
+    }
+    to {
+      translate: 0 0;
+      opacity: 1;
+    }
   }
   @keyframes orb-float {
     0%,

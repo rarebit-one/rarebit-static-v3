@@ -7,9 +7,10 @@ abandoned) and `rarebit-static` (v1, the original Brainwave React-Router SPA).
 ## Stack
 
 - **Astro** (`output: 'static'`) + **Tailwind 4** (CSS-first `@theme` in `src/styles/global.css`)
-- **Zero JS frameworks** — the only client script is the mobile nav toggle in `Header.astro`;
-  template animations (Splide carousel, react-just-parallax) were replaced with CSS grid and
-  CSS keyframes
+- **Zero JS frameworks** — only small vanilla scripts: the mobile nav toggle (`Header.astro`),
+  the Benefits carousel dots (`Benefits.astro`), and the copy buttons on `/connect`. Template
+  animations were replaced with CSS: react-just-parallax → CSS keyframes, and the Splide
+  carousel → a CSS scroll-snap track (`no-scrollbar` utility in `global.css`)
 - Self-hosted `@fontsource` fonts: Sora / Source Code Pro / Space Grotesk (the Brainwave trio)
 - Node 20+ (`.nvmrc` pins 22); `vite` is pinned as a direct dep so `@tailwindcss/vite` dedupes
   to Astro's vite major — removing it breaks `astro check`
