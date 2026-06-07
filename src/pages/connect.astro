@@ -3,6 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import Section from "../components/Section.astro";
 import Heading from "../components/Heading.astro";
 import Tagline from "../components/Tagline.astro";
+import Button from "../components/Button.astro";
 import { site } from "../data/site";
 
 const endpoint = site.mcpEndpoint;
@@ -76,14 +77,14 @@ const tools = [
 
 <Layout
   title="Connect — Rarebit"
-  description="Connect your AI assistant to Rarebit over MCP: ask how we work, scope your automation, and get in touch — without leaving your chat."
+  description="Connect your AI assistant to Rarebit over MCP — ask how we work, scope your automation, and get in touch without leaving your chat. On mobile? Use the form."
 >
   <Section crosses>
     <div class="container">
       <Heading
         tag="Model Context Protocol"
         title="Bring your own AI"
-        text="No contact form. Add our MCP server to the assistant you already use — ask it how we work, let it scope what you need, and send the inquiry without leaving the chat."
+        text="Add our MCP server to the assistant you already use — ask it how we work, let it scope what you need, and send the inquiry without leaving the chat. On your phone? Assistants only let you add connectors on web or desktop — the form below reaches the same inbox."
       />
 
       <div class="max-w-[50rem] mx-auto mb-15">
@@ -138,6 +139,78 @@ const tools = [
         </div>
       </div>
 
+      {/* Form fallback — same GitHub-issue inbox as submit_inquiry, via the
+          /inquiry function, for anyone who can't add an MCP connector. */}
+      <div class="max-w-[50rem] mx-auto mb-15" id="inquiry">
+        <div class="flex flex-col min-w-0 p-5 border border-n-1/10 rounded-3xl bg-n-7 md:p-8">
+          <Tagline class="mb-4">No MCP? Same inbox</Tagline>
+          <p class="body-2 mb-6 text-n-4">
+            On mobile, or just prefer typing it yourself? This lands exactly where the MCP
+            inquiries do — we read every one and reply by email.
+          </p>
+
+          <form data-inquiry-form novalidate>
+            <div class="grid gap-4 sm:grid-cols-2 mb-4">
+              <label class="block">
+                <span class="tagline block mb-2 text-n-4">Name</span>
+                <input
+                  class="w-full px-4 py-3 bg-n-8 border border-n-1/10 rounded-xl text-n-1 placeholder:text-n-4/50 transition-colors focus:outline-none focus:border-brand-cyan/60"
+                  type="text"
+                  name="name"
+                  required
+                  autocomplete="name"
+                />
+              </label>
+              <label class="block">
+                <span class="tagline block mb-2 text-n-4">Email</span>
+                <input
+                  class="w-full px-4 py-3 bg-n-8 border border-n-1/10 rounded-xl text-n-1 placeholder:text-n-4/50 transition-colors focus:outline-none focus:border-brand-cyan/60"
+                  type="email"
+                  name="email"
+                  required
+                  autocomplete="email"
+                />
+              </label>
+            </div>
+            <label class="block mb-4">
+              <span class="tagline block mb-2 text-n-4">Company <span class="normal-case">(optional)</span></span>
+              <input
+                class="w-full px-4 py-3 bg-n-8 border border-n-1/10 rounded-xl text-n-1 placeholder:text-n-4/50 transition-colors focus:outline-none focus:border-brand-cyan/60"
+                type="text"
+                name="company"
+                autocomplete="organization"
+              />
+            </label>
+            <label class="block mb-6">
+              <span class="tagline block mb-2 text-n-4">What would you automate?</span>
+              <textarea
+                class="w-full px-4 py-3 bg-n-8 border border-n-1/10 rounded-xl text-n-1 placeholder:text-n-4/50 transition-colors focus:outline-none focus:border-brand-cyan/60 min-h-32 resize-y"
+                name="message"
+                required
+                placeholder="The workflow, what makes it painful, and the tools it runs through today."></textarea>
+            </label>
+
+            {/* Honeypot — humans never see or fill this */}
+            <div class="hidden" aria-hidden="true">
+              <label>
+                Website
+                <input type="text" name="website" tabindex="-1" autocomplete="off" />
+              </label>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-4">
+              <Button data-inquiry-submit>Send inquiry</Button>
+              <p class="body-2 text-n-4" data-inquiry-status aria-live="polite"></p>
+            </div>
+          </form>
+
+          <p class="body-2 hidden text-n-2" data-inquiry-success>
+            Inquiry received — thank you! We read every submission and will reply by email
+            within two working days.
+          </p>
+        </div>
+      </div>
+
       <p class="body-2 text-center text-n-4">
         Prefer plain email? <a class="text-n-1 transition-colors hover:text-brand-magenta" href={`mailto:${site.email}`}>{site.email}</a>
       </p>
@@ -146,6 +219,45 @@ const tools = [
 </Layout>
 
 <script>
+  const form = document.querySelector<HTMLFormElement>("[data-inquiry-form]");
+  const submit = form?.querySelector<HTMLButtonElement>("[data-inquiry-submit]");
+  const status = form?.querySelector<HTMLElement>("[data-inquiry-status]");
+  const success = document.querySelector<HTMLElement>("[data-inquiry-success]");
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+    if (!status || !submit) return;
+
+    const label = submit.querySelector("span");
+    const idle = label?.textContent ?? "";
+    submit.disabled = true;
+    if (label) label.textContent = "Sending…";
+    status.textContent = "";
+
+    try {
+      const response = await fetch("/inquiry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.fromEntries(new FormData(form))),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok && payload.ok) {
+        form.classList.add("hidden");
+        success?.classList.remove("hidden");
+        return;
+      }
+      status.textContent =
+        payload.error ?? "Something went wrong — please email us instead.";
+    } catch {
+      status.textContent =
+        "Could not reach the inbox — please email us instead.";
+    } finally {
+      submit.disabled = false;
+      if (label) label.textContent = idle;
+    }
+  });
+
   document.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((button) => {
     button.addEventListener("click", async () => {
       const text = button.dataset.copy ?? "";

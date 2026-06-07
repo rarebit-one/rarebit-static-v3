@@ -122,26 +122,4 @@ export const openSourceCatalog: RepoCategory[] = [
       },
     ],
   },
-  {
-    id: "beyond-ruby",
-    title: "Beyond Ruby",
-    repos: [
-      {
-        name: "Ktor Armour",
-        repo: "ktor-armour",
-        kind: "Kotlin library",
-        version: "multi-module",
-        description: "A Ktor library suite: core, retry, and reporting.",
-        body: "Hardening primitives for Ktor services, split into focused Gradle modules so hosts pull only what they need.",
-      },
-      {
-        name: "Luminality UI",
-        repo: "luminality-ui",
-        kind: "npm package",
-        version: "GitHub Packages",
-        description: "The shared design system behind the Luminality apps.",
-        body: "React components and tokens shared across the Luminality web and mobile surfaces, published to GitHub Packages.",
-      },
-    ],
-  },
 ];

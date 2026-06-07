@@ -54,6 +54,12 @@ ingress:
         rewrite: /mcp/server
     - match:
         path:
+          prefix: /inquiry
+      component:
+        name: mcp
+        rewrite: /mcp/inquiry
+    - match:
+        path:
           prefix: /
       component:
         name: web

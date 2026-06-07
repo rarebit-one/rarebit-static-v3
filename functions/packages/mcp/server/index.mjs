@@ -64,16 +64,13 @@ submit_inquiry.`;
 
 const OPEN_SOURCE = `# Rarebit open source
 
-The primitives the farm runs on, released as focused libraries.
+The primitives the farm runs on, released as focused Ruby gems.
 All at https://github.com/rarebit-one/<repo>.
 
 ## Authentication & Identity (Ruby / Rails 8)
 - **standard_id** — comprehensive authentication engine: OAuth 2.0/OIDC with
-  PKCE, passwordless email & SMS OTP, dual web/API engines, STI sessions.
-- **standard_id-google** / **standard_id-apple** — social sign-in as opt-in
-  provider plugins.
-- **standard_id-provider** — scaffolding for building StandardId provider
-  plugins.
+  PKCE, passwordless email & SMS OTP, dual web/API engines, STI sessions, and
+  social sign-in (Google, Apple) via opt-in provider plugins.
 - **standard_singpass** — Singpass MyInfo (FAPI 2.0) client: PKCE, DPoP,
   private_key_jwt, ECDH-ES JWE decryption, 40+ field person-data parser.
 
@@ -87,11 +84,7 @@ All at https://github.com/rarebit-one/<repo>.
 
 ## Data Patterns (Ruby / Rails)
 - **standard_ledger** — immutable journal entries with declarative aggregate
-  projections (inline, async, sql, matview, trigger) and deterministic replay.
-
-## Beyond Ruby
-- **ktor-armour** — Kotlin/Ktor hardening suite: core, retry, reporting.
-- **luminality-ui** — the React design system behind the Luminality apps.`;
+  projections (inline, async, sql, matview, trigger) and deterministic replay.`;
 
 const QUESTIONNAIRE = {
   instructions:
@@ -156,7 +149,7 @@ const TOOLS = [
   {
     name: "open_source",
     description:
-      "Rarebit's open-source catalog: every library we publish (auth, reliability, data patterns, Kotlin, frontend) and what each is for.",
+      "Rarebit's open-source catalog: the Ruby gems we publish (auth, reliability, data patterns) and what each is for.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
