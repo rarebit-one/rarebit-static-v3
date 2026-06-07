@@ -57,8 +57,11 @@ npm run preview  # serve dist/
   (fine-grained PAT, Issues read/write on rarebit-ops only) + `GITHUB_REPO` env vars at runtime
   (declared in `functions/project.yml`). Smoke-test locally by importing `main` and posting
   envelopes. The MCP server's `open_source` canned content mirrors the /open-source page —
-  keep them in sync. NB: ingress changes (`.do/app.yaml`) only apply via
-  `doctl apps update <APP_ID> --spec .do/app.yaml`, not on push.
+  keep them in sync. NB: app-spec changes (`.do/app.yaml` — ingress, envs) don't apply on
+  push, and **never apply that file raw**: `doctl apps update --spec` is a full-spec replace
+  and the committed file deliberately omits the GITHUB_TOKEN secret — applying it verbatim
+  wipes the token and breaks all subsequent deploys. Merge changes into the live spec
+  (`doctl apps spec get`) instead; see the warning header in `.do/app.yaml`.
 - **Shared SVG gradient defs** (`#btn-*`, `#brackets-*`) live once in `Layout.astro`; Button and
   Tagline reference them by id. The Benefits clip-path (`#benefits`) lives in `Benefits.astro`.
 - **Motion is CSS-only** and gated behind `prefers-reduced-motion` (orb floats, caret blink in
