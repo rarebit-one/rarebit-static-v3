@@ -112,17 +112,6 @@ import { benefits } from "../../data/site";
       });
     };
 
-    dots.forEach((dot, index) => {
-      dot.addEventListener("click", () => {
-        // Scroll the track directly (not scrollIntoView) so the page never
-        // moves vertically when a dot is tapped.
-        track.scrollTo({
-          left: slideLeft(index),
-          behavior: reduceMotion.matches ? "auto" : "smooth",
-        });
-      });
-    });
-
     const nearestSlide = () =>
       slides.reduce(
         (best, _slide, index) =>
@@ -133,10 +122,62 @@ import { benefits } from "../../data/site";
         0
       );
 
+    // The furthest snap position the track can actually rest on — slides
+    // near the end can't be left-aligned once the remaining content is
+    // narrower than the viewport.
+    const clampToSnap = (left: number) => {
+      const max = track.scrollWidth - track.clientWidth;
+      return slides.reduce(
+        (best, _slide, index) =>
+          slideLeft(index) <= Math.min(left, max) ? slideLeft(index) : best,
+        0
+      );
+    };
+
+    // Programmatic glides suspend snapping: Chromium cancels smooth
+    // scrollTo() on a mandatory-snap container, so snap is turned off for
+    // the animation and restored once scroll events go quiet. Targets are
+    // pre-clamped to a real snap position so the restore never yanks the
+    // track. While a glide runs the scroll handler must not recompute the
+    // active dot (a clamped end-target would override the user's choice).
+    let gliding = false;
+    let glideSettleTimer = 0;
+
+    const armGlideSettle = () => {
+      clearTimeout(glideSettleTimer);
+      glideSettleTimer = window.setTimeout(() => {
+        gliding = false;
+        track.style.scrollSnapType = "";
+      }, 200);
+    };
+
+    const glideTo = (left: number) => {
+      gliding = true;
+      track.style.scrollSnapType = "none";
+      track.scrollTo({
+        left,
+        behavior: reduceMotion.matches ? "auto" : "smooth",
+      });
+      armGlideSettle();
+    };
+
+    dots.forEach((dot, index) => {
+      dot.addEventListener("click", () => {
+        setActive(index);
+        // Scroll the track directly (not scrollIntoView) so the page never
+        // moves vertically when a dot is tapped.
+        glideTo(clampToSnap(slideLeft(index)));
+      });
+    });
+
     let raf = 0;
     track.addEventListener(
       "scroll",
       () => {
+        if (gliding) {
+          armGlideSettle();
+          return;
+        }
         cancelAnimationFrame(raf);
         raf = requestAnimationFrame(() => setActive(nearestSlide()));
       },
@@ -144,8 +185,8 @@ import { benefits } from "../../data/site";
     );
 
     // Mouse drag-to-scroll (Splide-style). Touch devices scroll natively;
-    // snap is suspended via inline style during the drag so the track
-    // follows the pointer, then restored with a glide to the nearest slide.
+    // snap is suspended while the track follows the pointer, then restored
+    // with a glide to the nearest slide.
     let dragging = false;
     let dragStartX = 0;
     let dragStartScroll = 0;
@@ -168,15 +209,9 @@ import { benefits } from "../../data/site";
       if (!dragging) return;
       dragging = false;
       track.style.cursor = "";
-      track.scrollTo({
-        left: slideLeft(nearestSlide()),
-        behavior: reduceMotion.matches ? "auto" : "smooth",
-      });
-      // Restore snapping once the glide settles; doing it immediately would
-      // yank the track to a snap point mid-animation.
-      setTimeout(() => {
-        track.style.scrollSnapType = "";
-      }, 400);
+      const nearest = nearestSlide();
+      setActive(nearest);
+      glideTo(clampToSnap(slideLeft(nearest)));
     };
     window.addEventListener("pointerup", endDrag);
     window.addEventListener("pointercancel", endDrag);
