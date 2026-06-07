@@ -4,13 +4,19 @@
 # (see .do/app.yaml). The app's ingress rewrites /mcp → /mcp/server, which is
 # this package/function pair.
 #
-# SPACES_* env vars (the inquiry inbox) are injected by the app spec, not here.
+# The app spec's envs (GITHUB_TOKEN secret + GITHUB_REPO) exist only in the
+# *build* environment; the function's *runtime* env gets exactly what the
+# `environment:` block below declares — the ${VAR} references interpolate at
+# deploy time. Without this block process.env is empty at runtime.
 packages:
   - name: mcp
     functions:
       - name: server
         runtime: nodejs:18
         web: raw
+        environment:
+          GITHUB_TOKEN: "${GITHUB_TOKEN}"
+          GITHUB_REPO: "${GITHUB_REPO}"
         limits:
           timeout: 15000
           # Stateless string-serving — 128MB halves the GiB-s per call.
