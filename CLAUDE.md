@@ -53,7 +53,14 @@ npm run preview  # serve dist/
   and the stats strip falls back to the all-playful set rather than mixing real labels with
   fake numbers ("Managers: 0" stays obviously tongue-in-cheek). `weekly-rebuild.yml` forces a
   DO rebuild Mondays 06:00 SGT to keep the numbers fresh; `site-quality.yml` runs link checks
-  (blocking) and Lighthouse (advisory) on PRs.
+  (blocking) and Lighthouse (advisory) on PRs. The Operations receipts also upgrade client-side
+  into a **live feed**: the visitor's browser polls the public org-events API (CORS, ETag
+  conditional requests — 304s are rate-limit-free, paused when the tab is hidden) and renders
+  anonymized rows — actors become agent/operator chips; only event type + repo + number are
+  shown, never usernames, titles, or emails. Private-repo activity can't appear by
+  construction (unauthenticated API). The SSR receipts remain the no-JS fallback. NB: the
+  org-events payloads are slim (no html_url, no merged flag, no push sizes) — URLs are
+  constructed, and closed PRs say "closed", never "merged".
 - **Legal footer** (name, UEN, registered address) mirrors `rarebit-ops` `entity/profile.yml` —
   that file is the source of truth; update here when ACRA details change.
 - **Contact is MCP-first, form-fallback.** All CTAs route to `/connect`, which documents the

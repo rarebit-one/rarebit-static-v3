@@ -18,10 +18,18 @@ const merges = await recentMerges(3);
     />
 
     {
+      /* SSR receipts double as the no-JS fallback; the script upgrades them
+         into a live feed of public org activity polled straight from the
+         visitor's browser (CORS + ETag — 304s don't count against the
+         unauthenticated rate limit). Actors are anonymized to agent/operator;
+         only event type, repo, and number are ever rendered. */
       merges && (
-        <div class="mb-10">
-          <div class="tagline mb-3 text-n-4">Receipts · recent merges across the org</div>
-          <ul class="font-code text-xs leading-6 text-n-3">
+        <div class="mb-10" data-farm-feed>
+          <div class="flex items-center gap-2 mb-3">
+            <span class="hidden w-2 h-2 rounded-full bg-brand-cyan live-dot" data-feed-dot></span>
+            <span class="tagline text-n-4" data-feed-label>Receipts · recent merges across the org</span>
+          </div>
+          <ul class="font-code text-xs leading-6 text-n-3" data-feed-list aria-label="Public activity across the rarebit-one GitHub org">
             {merges.map((merge) => (
               <li class="flex items-baseline gap-3 py-2 border-t border-n-6 last:border-b min-w-0">
                 <a
@@ -209,3 +217,177 @@ const merges = await recentMerges(3);
     </div>
   </div>
 </Section>
+
+<script>
+  // Live farm feed — public org events, fetched by the visitor's browser.
+  // One request per minute with If-None-Match: 304s are free against the
+  // 60/h unauthenticated limit, and polling pauses while the tab is hidden.
+  // Anonymization: actors render as agent/operator chips (never usernames),
+  // and only event type + repo + number are shown — no titles, no emails.
+  const feed = document.querySelector<HTMLElement>("[data-farm-feed]");
+  const list = feed?.querySelector<HTMLUListElement>("[data-feed-list]");
+  const label = feed?.querySelector<HTMLElement>("[data-feed-label]");
+  const dot = feed?.querySelector<HTMLElement>("[data-feed-dot]");
+
+  type FeedItem = { id: string; who: "agent" | "operator"; text: string; url: string; at: number };
+
+  const EVENTS_URL = "https://api.github.com/orgs/rarebit-one/events?per_page=30";
+  const MAX_ROWS = 8;
+  let etag = "";
+  let items: FeedItem[] = [];
+  const seen = new Set<string>();
+  let timer = 0;
+
+  const ago = (at: number) => {
+    const s = Math.max(0, Math.floor((Date.now() - at) / 1000));
+    if (s < 60) return "just now";
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
+  };
+
+  // The public events API returns slim payloads (no html_url, no merged
+  // flag, no push sizes) — URLs are constructed from repo + number, and
+  // closed PRs say "closed" rather than claiming a merge we can't verify.
+  const describe = (event: any): { text: string; url: string } | null => {
+    const full: string = String(event.repo?.name ?? "");
+    const repo = full.split("/").pop() ?? "";
+    const base = `https://github.com/${full}`;
+    const p = event.payload ?? {};
+    switch (event.type) {
+      case "PullRequestEvent": {
+        const n = p.number ?? p.pull_request?.number;
+        if (!n || (p.action !== "opened" && p.action !== "closed")) return null;
+        return { text: `${p.action} ${repo}#${n}`, url: `${base}/pull/${n}` };
+      }
+      case "PullRequestReviewEvent": {
+        const n = p.pull_request?.number;
+        return n ? { text: `reviewed ${repo}#${n}`, url: `${base}/pull/${n}` } : null;
+      }
+      case "IssueCommentEvent": {
+        const n = p.issue?.number;
+        return n
+          ? { text: `commented ${repo}#${n}`, url: p.comment?.html_url ?? `${base}/issues/${n}` }
+          : null;
+      }
+      case "IssuesEvent": {
+        const n = p.issue?.number;
+        if (!n || (p.action !== "opened" && p.action !== "closed")) return null;
+        return { text: `${p.action} issue ${repo}#${n}`, url: `${base}/issues/${n}` };
+      }
+      case "PushEvent": {
+        const branch = String(p.ref ?? "").split("/").pop() ?? "";
+        if (!branch) return null;
+        return {
+          text: `pushed ${branch.slice(0, 28)} → ${repo}`,
+          url: `${base}/commits/${branch}`,
+        };
+      }
+      case "ReleaseEvent": {
+        const tag = p.release?.tag_name;
+        return tag
+          ? { text: `released ${tag} · ${repo}`, url: p.release?.html_url ?? `${base}/releases` }
+          : null;
+      }
+      default:
+        return null;
+    }
+  };
+
+  const render = () => {
+    if (!list) return;
+    list.textContent = "";
+    for (const item of items) {
+      const li = document.createElement("li");
+      li.className = "flex items-baseline gap-3 py-2 border-t border-n-6 last:border-b min-w-0";
+      if (!seen.has(item.id)) li.classList.add("feed-enter");
+
+      const chip = document.createElement("span");
+      const agent = item.who === "agent";
+      chip.className = `shrink-0 w-[4.5rem] uppercase tracking-wider ${agent ? "text-brand-cyan" : "text-brand-magenta"}`;
+      chip.textContent = item.who;
+
+      const link = document.createElement("a");
+      link.className = "truncate text-n-3 transition-colors hover:text-n-1";
+      link.href = item.url;
+      link.target = "_blank";
+      link.rel = "noreferrer";
+      link.textContent = item.text;
+
+      const time = document.createElement("span");
+      time.className = "ml-auto shrink-0 text-n-4";
+      time.textContent = ago(item.at);
+
+      li.append(chip, link, time);
+      list.append(li);
+    }
+    items.forEach((item) => seen.add(item.id));
+  };
+
+  const poll = async () => {
+    try {
+      const response = await fetch(EVENTS_URL, {
+        headers: {
+          Accept: "application/vnd.github+json",
+          ...(etag ? { "If-None-Match": etag } : {}),
+        },
+        cache: "no-store",
+      });
+      if (response.status === 304) {
+        render(); // refresh relative times
+        return;
+      }
+      if (!response.ok) return;
+      etag = response.headers.get("ETag") ?? etag;
+      const events = await response.json();
+      if (!Array.isArray(events)) return;
+      const mapped = events
+        .map((event): FeedItem | null => {
+          const described = describe(event);
+          if (!described || !described.url) return null;
+          const login: string = event.actor?.login ?? "";
+          return {
+            id: String(event.id),
+            who: login.endsWith("[bot]") ? "agent" : "operator",
+            text: described.text,
+            url: described.url,
+            at: Date.parse(event.created_at ?? "") || Date.now(),
+          };
+        })
+        .filter((item): item is FeedItem => item !== null);
+      // The review bots comment constantly — cap comment rows so merges,
+      // pushes, and releases stay visible in the window.
+      items = [];
+      let comments = 0;
+      for (const item of mapped) {
+        if (item.text.startsWith("commented")) {
+          if (comments >= 2) continue;
+          comments += 1;
+        }
+        items.push(item);
+        if (items.length >= MAX_ROWS) break;
+      }
+      if (items.length === 0) return; // keep SSR receipts
+      if (label) label.textContent = "Live from the farm · public org activity";
+      dot?.classList.remove("hidden");
+      render();
+    } catch {
+      /* network blocked — the SSR receipts stay */
+    }
+  };
+
+  const schedule = () => {
+    clearInterval(timer);
+    timer = window.setInterval(() => {
+      if (!document.hidden) poll();
+    }, 60_000);
+  };
+
+  if (feed && list) {
+    poll();
+    schedule();
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) poll();
+    });
+  }
+</script>
