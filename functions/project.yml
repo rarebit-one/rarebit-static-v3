@@ -6,8 +6,10 @@
 #
 # The app spec's envs (GITHUB_TOKEN secret + GITHUB_REPO) exist only in the
 # *build* environment; the function's *runtime* env gets exactly what the
-# `environment:` block below declares — the ${VAR} references interpolate at
-# deploy time. Without this block process.env is empty at runtime.
+# `environment:` block below declares — the dollar-brace references
+# interpolate at deploy time. Without this block process.env is empty at
+# runtime. NB: the deploy parser scans this whole file (comments included)
+# for dollar-brace tokens, so don't write one here.
 packages:
   - name: mcp
     functions:
