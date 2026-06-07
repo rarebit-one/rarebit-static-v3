@@ -25,12 +25,33 @@ const catalog = await Promise.all(
     ),
   }))
 );
+
+const softwareLd = {
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  name: "Rarebit open-source Ruby gems",
+  itemListElement: catalog
+    .flatMap((category) => category.repos)
+    .map((repo, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      item: {
+        "@type": "SoftwareSourceCode",
+        name: repo.name,
+        description: repo.description,
+        codeRepository: `https://github.com/rarebit-one/${repo.repo}`,
+        programmingLanguage: "Ruby",
+        version: repo.version.replace(/^v/, ""),
+      },
+    })),
+};
 ---
 
 <Layout
   title="Open source — Rarebit"
   description="The primitives the Rarebit automation farm runs on — auth, audit, ledger, health, and circuit-breaker building blocks — are open source. Use them."
 >
+  <script is:inline type="application/ld+json" set:html={JSON.stringify(softwareLd)} />
   <Section crosses>
     <div class="container">
       <Heading
@@ -45,7 +66,7 @@ const catalog = await Promise.all(
             <h3 class="h4 mb-8">{category.title}</h3>
             <div class="grid gap-5 lg:grid-cols-2">
               {category.repos.map((repo) => (
-                <div class="relative flex flex-col p-6 border border-n-1/10 rounded-3xl bg-n-7 overflow-hidden transition-colors hover:border-brand-cyan/30 md:p-8 xl:p-10">
+                <div class="reveal relative flex flex-col p-6 border border-n-1/10 rounded-3xl bg-n-7 overflow-hidden transition-colors hover:border-brand-cyan/30 md:p-8 xl:p-10">
                   <div class="absolute top-0 left-0 max-w-full opacity-40 pointer-events-none">
                     <img class="w-full" src="/images/grid.png" width="550" height="550" alt="" />
                   </div>

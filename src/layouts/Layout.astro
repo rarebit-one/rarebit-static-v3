@@ -18,7 +18,27 @@ interface Props {
 }
 
 const { title = site.title, description = site.description } = Astro.props;
-const ogImage = new URL("/images/rarebit/dashboard-factory.webp", Astro.site);
+// Dedicated 1200×630 JPG (cropped from the dashboard brand art) — broadest
+// crawler support; some platforms still skip webp og:images.
+const ogImage = new URL("/images/rarebit/og.jpg", Astro.site);
+const canonical = new URL(Astro.url.pathname, Astro.site);
+
+const organizationLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "Rarebit One",
+  legalName: "RAREBIT ONE",
+  url: "https://rarebit.one",
+  logo: new URL("/images/rarebit/logo.webp", Astro.site).href,
+  email: site.email,
+  sameAs: [site.github],
+  address: {
+    "@type": "PostalAddress",
+    streetAddress: "60 Paya Lebar Road, #06-28, Paya Lebar Square",
+    postalCode: "409051",
+    addressCountry: "SG",
+  },
+};
 ---
 
 <!doctype html>
@@ -30,6 +50,8 @@ const ogImage = new URL("/images/rarebit/dashboard-factory.webp", Astro.site);
     <meta name="description" content={description} />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="sitemap" href="/sitemap-index.xml" />
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" type="application/rss+xml" title="Rarebit — Field notes" href="/rss.xml" />
     <meta name="theme-color" content="#0e0c15" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
@@ -40,6 +62,7 @@ const ogImage = new URL("/images/rarebit/dashboard-factory.webp", Astro.site);
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(organizationLd)} />
   </head>
   <body class="font-sans bg-n-8 text-n-1 text-base tap-highlight-color">
     <div class="pt-[4.75rem] lg:pt-[5.25rem] overflow-hidden">

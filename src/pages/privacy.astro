@@ -1,0 +1,52 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Section from "../components/Section.astro";
+import Heading from "../components/Heading.astro";
+import { site, legal } from "../data/site";
+---
+
+<Layout
+  title="Privacy — Rarebit"
+  description="What Rarebit collects when you get in touch, where it goes, and how to have it removed."
+>
+  <Section crosses>
+    <div class="container">
+      <Heading tag="The boring page, kept honest" title="Privacy" />
+
+      <div class="max-w-[43.125rem] mx-auto">
+        <div class="body-2 text-n-3 [&>h2]:h6 [&>h2]:text-n-1 [&>h2]:mt-10 [&>h2]:mb-3 [&>p]:mb-4">
+          <h2>What we collect</h2>
+          <p>
+            This site sets no cookies, runs no trackers, and loads nothing from third parties.
+            The only personal data we receive is what you choose to send us: the inquiry form on
+            <a class="text-n-1 transition-colors hover:text-brand-magenta" href="/connect">/connect</a>,
+            the MCP <code class="font-code text-sm text-brand-cyan">submit_inquiry</code> tool, or
+            plain email — a name, an email address, optionally a company, and your message.
+          </p>
+
+          <h2>Where it goes</h2>
+          <p>
+            Form and MCP inquiries are stored as issues in a <strong class="text-n-1">private</strong>
+            GitHub repository that only Rarebit operators can read, and are used solely to reply to
+            you. Transport runs through DigitalOcean (our host, Singapore region) and GitHub
+            (storage). We don't sell, share, or enrich your data, and we don't add you to any list.
+          </p>
+
+          <h2>How long we keep it</h2>
+          <p>
+            Until the conversation is resolved, plus housekeeping. Want it gone sooner? Email
+            <a class="text-n-1 transition-colors hover:text-brand-magenta" href={`mailto:${site.email}`}>{site.email}</a>
+            and we'll delete the issue — confirmation included.
+          </p>
+
+          <h2>Who we are</h2>
+          <p>
+            {legal.name} (UEN {legal.uen}), {legal.address}. Questions about this page or your
+            data under Singapore's PDPA go to the same address:
+            <a class="text-n-1 transition-colors hover:text-brand-magenta" href={`mailto:${site.email}`}>{site.email}</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </Section>
+</Layout>

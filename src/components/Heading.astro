@@ -18,7 +18,7 @@ const {
 } = Astro.props;
 ---
 
-<div class={`max-w-[50rem] mx-auto mb-12 ${textAlignClass} lg:mb-20 ${className}`}>
+<div class={`reveal max-w-[50rem] mx-auto mb-12 ${textAlignClass} lg:mb-20 ${className}`}>
   {tag && <Tagline class="mb-4 md:justify-center">{tag}</Tagline>}
   {title && <h2 class="h2">{title}</h2>}
   {text && <p class="body-2 mt-4 text-n-4">{text}</p>}

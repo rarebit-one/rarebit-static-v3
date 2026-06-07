@@ -1,0 +1,49 @@
+---
+import Section from "../Section.astro";
+import Heading from "../Heading.astro";
+import Tagline from "../Tagline.astro";
+
+const steps = [
+  {
+    phase: "Day 0",
+    title: "Map the workflows",
+    text: "A working session over your actual queues. We leave with a list: what an agent can own end-to-end, what needs a human in the loop, and what isn't worth automating.",
+  },
+  {
+    phase: "Week 1",
+    title: "First automation live",
+    text: "One workflow, production-grade: agent on the queue, human on the approval. You watch it run before we go wider.",
+  },
+  {
+    phase: "Week 4+",
+    title: "The farm runs",
+    text: "More queues, same pattern. You get the receipts — what ran, what shipped, where a human signed off — and you can take the keys any time.",
+  },
+];
+---
+
+<Section id="engagement" crosses>
+  <div class="container">
+    <Heading tag="From audit to autopilot" title="How an engagement runs" />
+
+    <div class="grid gap-5 md:grid-cols-3">
+      {
+        steps.map((step, index) => (
+          <div class="reveal relative flex flex-col p-6 border border-n-1/10 rounded-3xl bg-n-7 overflow-hidden transition-colors hover:border-brand-cyan/30 md:p-8">
+            <div class="absolute top-0 left-0 max-w-full opacity-40 pointer-events-none">
+              <img class="w-full" src="/images/grid.png" width="550" height="550" alt="" />
+            </div>
+            <div class="relative z-1">
+              <div class="flex items-center justify-between mb-6">
+                <Tagline>{step.phase}</Tagline>
+                <div class="h3 font-semibold text-n-6">0{index + 1}</div>
+              </div>
+              <h5 class="h5 mb-4">{step.title}</h5>
+              <p class="body-2 text-n-4">{step.text}</p>
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</Section>

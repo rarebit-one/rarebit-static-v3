@@ -176,4 +176,24 @@ html {
       opacity: 0;
     }
   }
+
+  /* Scroll-driven reveals — progressive enhancement; browsers without
+     animation-timeline (or with reduced motion) render statically. */
+  @supports (animation-timeline: view()) {
+    .reveal {
+      animation: reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 50%;
+    }
+    @keyframes reveal {
+      from {
+        opacity: 0;
+        translate: 0 1.25rem;
+      }
+      to {
+        opacity: 1;
+        translate: 0 0;
+      }
+    }
+  }
 }
