@@ -1,16 +1,15 @@
 // Rarebit MCP server — Streamable HTTP (JSON-RPC over POST), stateless.
 //
 // The front door for AI assistants (/connect documents the client setup).
-// Three read tools serve canned content from this file; submit_inquiry PUTs a
-// JSON document into the DO Spaces inquiry inbox via a minimal SigV4 signer
-// (no SDK — the function deploys with zero dependencies).
+// Three read tools serve canned content from this file; submit_inquiry opens
+// a GitHub issue in the (private) ops repo, where leads sit next to the
+// counterparty records and can be triaged like any other work item.
 //
-// Env (set by .do/app.yaml on the functions component):
-//   SPACES_KEY, SPACES_SECRET — Spaces access key pair (secret)
-//   SPACES_BUCKET             — inquiry inbox bucket
-//   SPACES_REGION             — e.g. sgp1
+// Env (set on the functions component; see .do/app.yaml):
+//   GITHUB_TOKEN — fine-grained PAT, Issues read/write on GITHUB_REPO only (secret)
+//   GITHUB_REPO  — owner/name receiving inquiry issues (e.g. rarebit-one/rarebit-ops)
 
-import { createHash, createHmac, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 const PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 const SERVER_INFO = { name: "rarebit-mcp", version: "0.1.0" };
@@ -194,47 +193,57 @@ const TOOLS = [
 ];
 
 // ---------------------------------------------------------------------------
-// Spaces (S3) SigV4 PUT — no SDK
+// GitHub issue creation — the inquiry inbox
 // ---------------------------------------------------------------------------
 
-const sha256 = (data) => createHash("sha256").update(data).digest("hex");
-const hmac = (key, data) => createHmac("sha256", key).update(data).digest();
+// Public-endpoint hygiene: cap field lengths and strip control characters so a
+// hostile caller can't balloon an issue body or smuggle weird bytes into it.
+const clean = (value, max) =>
+  String(value ?? "")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    .trim()
+    .slice(0, max);
 
-async function putToSpaces(key, body) {
-  const { SPACES_KEY, SPACES_SECRET, SPACES_BUCKET, SPACES_REGION } = process.env;
-  if (!SPACES_KEY || !SPACES_SECRET || !SPACES_BUCKET || !SPACES_REGION) {
+async function createInquiryIssue({ id, who, email, company, summary, answers }) {
+  const { GITHUB_TOKEN, GITHUB_REPO } = process.env;
+  if (!GITHUB_TOKEN || !GITHUB_REPO) {
     throw new Error("inquiry inbox is not configured");
   }
 
-  const host = `${SPACES_BUCKET}.${SPACES_REGION}.digitaloceanspaces.com`;
-  const now = new Date();
-  const amzDate = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-  const dateStamp = amzDate.slice(0, 8);
-  const payloadHash = sha256(body);
-  const canonicalUri = `/${key}`;
+  const lines = [
+    `**From:** ${who} <${email}>`,
+    company ? `**Company:** ${company}` : null,
+    `**Received:** ${new Date().toISOString()} via MCP (\`${id}\`)`,
+    "",
+    "## Summary",
+    "",
+    summary,
+  ].filter((line) => line !== null);
 
-  const canonicalHeaders =
-    `content-type:application/json\nhost:${host}\n` +
-    `x-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
-  const signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date";
-  const canonicalRequest = `PUT\n${canonicalUri}\n\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
+  if (answers && typeof answers === "object") {
+    const entries = Object.entries(answers).slice(0, 12);
+    if (entries.length) {
+      lines.push("", "## Intake answers", "");
+      for (const [key, value] of entries) {
+        lines.push(`**${clean(key, 40)}**`, "", clean(value, 1000), "");
+      }
+    }
+  }
 
-  const scope = `${dateStamp}/${SPACES_REGION}/s3/aws4_request`;
-  const stringToSign = `AWS4-HMAC-SHA256\n${amzDate}\n${scope}\n${sha256(canonicalRequest)}`;
-  const signingKey = hmac(hmac(hmac(hmac(`AWS4${SPACES_SECRET}`, dateStamp), SPACES_REGION), "s3"), "aws4_request");
-  const signature = createHmac("sha256", signingKey).update(stringToSign).digest("hex");
-
-  const response = await fetch(`https://${host}${canonicalUri}`, {
-    method: "PUT",
+  const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/issues`, {
+    method: "POST",
     headers: {
+      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "rarebit-mcp",
       "Content-Type": "application/json",
-      "x-amz-content-sha256": payloadHash,
-      "x-amz-date": amzDate,
-      Authorization:
-        `AWS4-HMAC-SHA256 Credential=${SPACES_KEY}/${scope}, ` +
-        `SignedHeaders=${signedHeaders}, Signature=${signature}`,
     },
-    body,
+    body: JSON.stringify({
+      title: `Inquiry: ${who}${company ? ` (${company})` : ""}`,
+      body: lines.join("\n"),
+      labels: ["inquiry"],
+    }),
   });
   if (!response.ok) {
     throw new Error(`inbox write failed (${response.status})`);
@@ -265,23 +274,15 @@ async function callTool(name, args) {
       if (typeof summary !== "string" || !summary.trim()) return toolError("summary is required");
 
       const id = `${new Date().toISOString().slice(0, 10)}-${randomUUID().slice(0, 8)}`;
-      const record = JSON.stringify(
-        {
-          id,
-          received_at: new Date().toISOString(),
-          name: who.trim(),
-          email: email.trim(),
-          company: typeof company === "string" ? company.trim() : undefined,
-          summary: summary.trim(),
-          answers: answers && typeof answers === "object" ? answers : undefined,
-          source: "mcp",
-        },
-        null,
-        2
-      );
-
       try {
-        await putToSpaces(`inquiries/${id}.json`, record);
+        await createInquiryIssue({
+          id,
+          who: clean(who, 200),
+          email: clean(email, 200),
+          company: typeof company === "string" ? clean(company, 200) : undefined,
+          summary: clean(summary, 4000),
+          answers,
+        });
       } catch (error) {
         return toolError(
           `Could not record the inquiry (${error.message}). ` +

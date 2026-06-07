@@ -13,9 +13,10 @@
 #
 # The `mcp` functions component serves https://rarebit.one/mcp (the ingress
 # rewrites /mcp → /mcp/server, i.e. package `mcp` / function `server` under
-# functions/). Its SPACES_KEY + SPACES_SECRET env vars (the inquiry inbox
-# credentials) are set on the live app only — never commit them here; without
-# them submit_inquiry degrades to an email-fallback message.
+# functions/). Its GITHUB_TOKEN env var (fine-grained PAT, Issues read/write on
+# GITHUB_REPO only — the inquiry inbox) is set on the live app only — never
+# commit it here; without it submit_inquiry degrades to an email-fallback
+# message.
 name: rarebit-static-v3
 region: sgp
 
@@ -39,12 +40,9 @@ functions:
       branch: main
       deploy_on_push: true
     envs:
-      - key: SPACES_BUCKET
+      - key: GITHUB_REPO
         scope: RUN_TIME
-        value: rarebit-mcp-inbox
-      - key: SPACES_REGION
-        scope: RUN_TIME
-        value: sgp1
+        value: rarebit-one/rarebit-ops
 
 ingress:
   rules:

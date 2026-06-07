@@ -43,9 +43,10 @@ npm run preview  # serve dist/
 - **Contact is MCP-first.** All CTAs route to `/connect`, which documents the MCP endpoint
   (`https://rarebit.one/mcp`); email is the fallback. The endpoint is a DO Functions component in
   the same app (`functions/packages/mcp/server/index.mjs` — zero-dependency Streamable HTTP
-  JSON-RPC, canned content + a SigV4 writer that drops `submit_inquiry` payloads into the
-  `rarebit-mcp-inbox` Spaces bucket, sgp1). Smoke-test it locally by importing `main` and posting
-  JSON-RPC envelopes; `tools/call submit_inquiry` needs `SPACES_*` env vars.
+  JSON-RPC, canned content + `submit_inquiry`, which opens a labeled `inquiry` issue in
+  `rarebit-one/rarebit-ops`). Smoke-test it locally by importing `main` and posting JSON-RPC
+  envelopes; `tools/call submit_inquiry` needs `GITHUB_TOKEN` (fine-grained PAT, Issues
+  read/write on rarebit-ops only) + `GITHUB_REPO` env vars.
 - **Shared SVG gradient defs** (`#btn-*`, `#brackets-*`) live once in `Layout.astro`; Button and
   Tagline reference them by id. The Benefits clip-path (`#benefits`) lives in `Benefits.astro`.
 - **Motion is CSS-only** and gated behind `prefers-reduced-motion` (orb floats, caret blink in
