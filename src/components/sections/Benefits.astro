@@ -12,14 +12,18 @@ import { benefits } from "../../data/site";
       text="The automations on our own farm — the same ones we bring to every AI adoption engagement."
     />
 
-    <div class="grid gap-6 md:grid-cols-2 md:gap-x-10 md:gap-y-[4.5rem] lg:grid-cols-3 xl:gap-y-[6rem]">
+    {/* Scroll-snap carousel — the CSS stand-in for the template's Splide */}
+    <div
+      class="flex gap-6 overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar -mx-5 px-5 scroll-px-5 md:mx-0 md:px-0 md:scroll-px-0"
+      data-benefits-track
+    >
       {
         benefits.map((item) => (
           <div
-            class="block relative p-0.5 bg-no-repeat bg-[length:100%_100%] md:max-w-[24rem]"
+            class="block relative shrink-0 snap-start w-full max-w-[24rem] p-0.5 bg-no-repeat bg-[length:100%_100%]"
             style={`background-image: url(${item.backgroundUrl})`}
           >
-            <div class="relative z-2 flex flex-col h-[22.625rem] p-[2.375rem] pointer-events-none">
+            <div class="relative z-2 flex flex-col h-[22.625rem] p-6 md:p-[2.375rem] pointer-events-none">
               <h5 class="h5 mb-5">{item.title}</h5>
               <p class="body-2 mb-6 text-n-3">{item.text}</p>
               <div class="flex items-center mt-auto">
@@ -53,6 +57,27 @@ import { benefits } from "../../data/site";
       }
     </div>
 
+    <div class="flex mt-12 -mx-2 md:mt-15 lg:justify-center xl:mt-20">
+      {
+        benefits.map((item, index) => (
+          <button
+            class="relative w-6 h-6 mx-2"
+            data-benefits-dot
+            aria-label={`Go to ${item.title}`}
+          >
+            <span
+              class={`absolute inset-0 bg-conic-gradient rounded-full transition-opacity ${
+                index === 0 ? "opacity-100" : "opacity-0"
+              }`}
+            />
+            <span class="absolute inset-0.25 bg-n-8 rounded-full">
+              <span class="absolute inset-2 bg-n-1 rounded-full" />
+            </span>
+          </button>
+        ))
+      }
+    </div>
+
     <svg class="block" width="0" height="0">
       <clipPath id="benefits" clipPathUnits="objectBoundingBox">
         <path
@@ -62,3 +87,47 @@ import { benefits } from "../../data/site";
     </svg>
   </div>
 </Section>
+
+<script>
+  const track = document.querySelector<HTMLElement>("[data-benefits-track]");
+  const slides = Array.from(track?.children ?? []) as HTMLElement[];
+  const dots = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-benefits-dot]"));
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  const setActive = (active: number) => {
+    dots.forEach((dot, index) => {
+      dot.firstElementChild?.classList.toggle("opacity-100", index === active);
+      dot.firstElementChild?.classList.toggle("opacity-0", index !== active);
+    });
+  };
+
+  dots.forEach((dot, index) => {
+    dot.addEventListener("click", () => {
+      slides[index]?.scrollIntoView({
+        behavior: reduceMotion.matches ? "auto" : "smooth",
+        block: "nearest",
+        inline: "start",
+      });
+    });
+  });
+
+  let raf = 0;
+  track?.addEventListener(
+    "scroll",
+    () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const nearest = slides.reduce(
+          (best, slide, index) =>
+            Math.abs(slide.offsetLeft - track.scrollLeft) <
+            Math.abs(slides[best].offsetLeft - track.scrollLeft)
+              ? index
+              : best,
+          0
+        );
+        setActive(nearest);
+      });
+    },
+    { passive: true }
+  );
+</script>
