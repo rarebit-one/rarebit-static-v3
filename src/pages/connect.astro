@@ -11,11 +11,12 @@ const endpoint = site.mcpEndpoint;
 
 // Desktop → phone handoff: connectors must be added on web/desktop, but the
 // form works anywhere — the QR opens this page on the phone. Build-time SVG,
-// no client JS.
+// no client JS. Dark-on-light (not inverted) — some scanner apps still
+// silently fail on negative QR codes.
 const qrSvg = await QRCode.toString(`https://${site.domain}/connect`, {
   type: "svg",
-  margin: 0,
-  color: { dark: "#cac6dd", light: "#0000" },
+  margin: 1,
+  color: { dark: "#0e0c15", light: "#ffffff" },
 });
 
 const clients = [
@@ -191,7 +192,10 @@ const tools = [
               </p>
             </div>
             <div class="hidden shrink-0 text-center md:block" aria-hidden="true">
-              <div class="w-24 h-24 [&>svg]:w-full [&>svg]:h-full" set:html={qrSvg} />
+              <div
+                class="w-24 h-24 p-1.5 bg-white rounded-lg [&>svg]:w-full [&>svg]:h-full"
+                set:html={qrSvg}
+              />
               <div class="tagline mt-2 text-n-4/70">Open on phone</div>
             </div>
           </div>
