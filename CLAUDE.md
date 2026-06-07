@@ -47,13 +47,18 @@ npm run preview  # serve dist/
   Stats are playful fakes ("Managers: 0") — keep them obviously tongue-in-cheek, not claims.
 - **Legal footer** (name, UEN, registered address) mirrors `rarebit-ops` `entity/profile.yml` —
   that file is the source of truth; update here when ACRA details change.
-- **Contact is MCP-first.** All CTAs route to `/connect`, which documents the MCP endpoint
-  (`https://rarebit.one/mcp`); email is the fallback. The endpoint is a DO Functions component in
-  the same app (`functions/packages/mcp/server/index.mjs` — zero-dependency Streamable HTTP
-  JSON-RPC, canned content + `submit_inquiry`, which opens a labeled `inquiry` issue in
-  `rarebit-one/rarebit-ops`). Smoke-test it locally by importing `main` and posting JSON-RPC
-  envelopes; `tools/call submit_inquiry` needs `GITHUB_TOKEN` (fine-grained PAT, Issues
-  read/write on rarebit-ops only) + `GITHUB_REPO` env vars.
+- **Contact is MCP-first, form-fallback.** All CTAs route to `/connect`, which documents the
+  MCP endpoint (`https://rarebit.one/mcp`) and carries an inquiry form for users who can't add
+  an MCP connector (assistants only allow that on web/desktop, so mobile needs the form); email
+  is the last resort. Both are DO Functions in the same app under `functions/packages/mcp/`:
+  `server/index.mjs` (zero-dependency Streamable HTTP JSON-RPC, canned content +
+  `submit_inquiry`) and `inquiry/index.mjs` (plain POST for the form, ingress `/inquiry`).
+  Both open a labeled `inquiry` issue in `rarebit-one/rarebit-ops` and need `GITHUB_TOKEN`
+  (fine-grained PAT, Issues read/write on rarebit-ops only) + `GITHUB_REPO` env vars at runtime
+  (declared in `functions/project.yml`). Smoke-test locally by importing `main` and posting
+  envelopes. The MCP server's `open_source` canned content mirrors the /open-source page —
+  keep them in sync. NB: ingress changes (`.do/app.yaml`) only apply via
+  `doctl apps update <APP_ID> --spec .do/app.yaml`, not on push.
 - **Shared SVG gradient defs** (`#btn-*`, `#brackets-*`) live once in `Layout.astro`; Button and
   Tagline reference them by id. The Benefits clip-path (`#benefits`) lives in `Benefits.astro`.
 - **Motion is CSS-only** and gated behind `prefers-reduced-motion` (orb floats, caret blink in

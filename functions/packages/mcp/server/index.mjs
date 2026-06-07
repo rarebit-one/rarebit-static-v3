@@ -64,16 +64,13 @@ submit_inquiry.`;
 
 const OPEN_SOURCE = `# Rarebit open source
 
-The primitives the farm runs on, released as focused libraries.
+The primitives the farm runs on, released as focused Ruby gems.
 All at https://github.com/rarebit-one/<repo>.
 
 ## Authentication & Identity (Ruby / Rails 8)
 - **standard_id** — comprehensive authentication engine: OAuth 2.0/OIDC with
-  PKCE, passwordless email & SMS OTP, dual web/API engines, STI sessions.
-- **standard_id-google** / **standard_id-apple** — social sign-in as opt-in
-  provider plugins.
-- **standard_id-provider** — scaffolding for building StandardId provider
-  plugins.
+  PKCE, passwordless email & SMS OTP, dual web/API engines, STI sessions, and
+  social sign-in (Google, Apple) via opt-in provider plugins.
 - **standard_singpass** — Singpass MyInfo (FAPI 2.0) client: PKCE, DPoP,
   private_key_jwt, ECDH-ES JWE decryption, 40+ field person-data parser.
 
@@ -87,11 +84,7 @@ All at https://github.com/rarebit-one/<repo>.
 
 ## Data Patterns (Ruby / Rails)
 - **standard_ledger** — immutable journal entries with declarative aggregate
-  projections (inline, async, sql, matview, trigger) and deterministic replay.
-
-## Beyond Ruby
-- **ktor-armour** — Kotlin/Ktor hardening suite: core, retry, reporting.
-- **luminality-ui** — the React design system behind the Luminality apps.`;
+  projections (inline, async, sql, matview, trigger) and deterministic replay.`;
 
 const QUESTIONNAIRE = {
   instructions:
@@ -156,7 +149,7 @@ const TOOLS = [
   {
     name: "open_source",
     description:
-      "Rarebit's open-source catalog: every library we publish (auth, reliability, data patterns, Kotlin, frontend) and what each is for.",
+      "Rarebit's open-source catalog: the Ruby gems we publish (auth, reliability, data patterns) and what each is for.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
@@ -266,22 +259,29 @@ async function callTool(name, args) {
     case "intake_questionnaire":
       return text(JSON.stringify(QUESTIONNAIRE, null, 2));
     case "submit_inquiry": {
-      const { name: who, email, company, summary, answers } = args ?? {};
-      if (typeof who !== "string" || !who.trim()) return toolError("name is required");
-      if (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      // Clean first, validate the cleaned values — what's validated is
+      // exactly what lands in the issue (truncation can't produce an
+      // unvalidated value).
+      const who = clean(args?.name, 200);
+      const email = clean(args?.email, 200);
+      const company = clean(args?.company, 200);
+      const summary = clean(args?.summary, 4000);
+
+      if (!who) return toolError("name is required");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return toolError("a valid email is required");
       }
-      if (typeof summary !== "string" || !summary.trim()) return toolError("summary is required");
+      if (!summary) return toolError("summary is required");
 
       const id = `${new Date().toISOString().slice(0, 10)}-${randomUUID().slice(0, 8)}`;
       try {
         await createInquiryIssue({
           id,
-          who: clean(who, 200),
-          email: clean(email, 200),
-          company: typeof company === "string" ? clean(company, 200) : undefined,
-          summary: clean(summary, 4000),
-          answers,
+          who,
+          email,
+          company: company || undefined,
+          summary,
+          answers: args?.answers,
         });
       } catch (error) {
         return toolError(
@@ -290,7 +290,7 @@ async function callTool(name, args) {
         );
       }
       return text(
-        `Inquiry ${id} received — thank you! We read every submission and will reply to ${email.trim()} ` +
+        `Inquiry ${id} received — thank you! We read every submission and will reply to ${email} ` +
           "within two working days."
       );
     }

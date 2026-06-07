@@ -23,3 +23,15 @@ packages:
           timeout: 15000
           # Stateless string-serving — 128MB halves the GiB-s per call.
           memory: 128
+      # The /connect contact form's endpoint (ingress: /inquiry). Same inbox
+      # as the MCP server's submit_inquiry, plain HTTP POST instead of
+      # JSON-RPC — for users who can't add an MCP connector (mobile).
+      - name: inquiry
+        runtime: nodejs:18
+        web: raw
+        environment:
+          GITHUB_TOKEN: "${GITHUB_TOKEN}"
+          GITHUB_REPO: "${GITHUB_REPO}"
+        limits:
+          timeout: 15000
+          memory: 128
