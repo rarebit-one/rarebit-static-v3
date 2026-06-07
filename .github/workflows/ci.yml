@@ -32,6 +32,9 @@ jobs:
       - name: Astro type check
         run: npm run check
 
+      - name: MCP canned-content drift check
+        run: npm run sync:mcp && git diff --exit-code -- functions/
+
       - name: Build
         run: npm run build
 

@@ -3,6 +3,22 @@ import Section from "../Section.astro";
 import Button from "../Button.astro";
 import Generating from "../Generating.astro";
 import { stats } from "../../data/site";
+import { openSourceCatalog } from "../../data/openSource";
+import { mergedPrCount, totalGemDownloads, compactNumber } from "../../lib/farm";
+
+// Real receipts when the APIs answer at build time; the classic joke strip
+// otherwise — never a half-real mix that makes the jokes look like claims.
+const gems = openSourceCatalog.flatMap((category) => category.repos.map((repo) => repo.repo));
+const [prCount, downloads] = await Promise.all([mergedPrCount(30), totalGemDownloads(gems)]);
+const live = prCount !== null && downloads !== null;
+const farmStats = live
+  ? [
+      { label: "PRs merged · 30 days", value: prCount.toLocaleString("en-SG") },
+      { label: "Gem downloads", value: compactNumber(downloads) },
+      { label: "Open-source gems", value: String(gems.length) },
+      { label: "Managers", value: "0" },
+    ]
+  : stats;
 ---
 
 <Section
@@ -165,7 +181,7 @@ import { stats } from "../../data/site";
       <h5 class="tagline mb-6 text-center text-n-1/50">The farm never sleeps</h5>
       <ul class="flex">
         {
-          stats.map((stat) => (
+          farmStats.map((stat) => (
             <li class="flex flex-col items-center justify-center flex-1 h-[8.5rem]">
               <div class="h3 font-semibold">{stat.value}</div>
               <div class="tagline mt-2 text-n-4">{stat.label}</div>
@@ -173,6 +189,13 @@ import { stats } from "../../data/site";
           ))
         }
       </ul>
+      {
+        live && (
+          <p class="caption mt-4 text-center text-n-4/70">
+            Counted from public GitHub &amp; RubyGems at build time. Managers: genuinely zero.
+          </p>
+        )
+      }
     </div>
   </div>
 

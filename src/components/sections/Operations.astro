@@ -2,6 +2,11 @@
 import Section from "../Section.astro";
 import Heading from "../Heading.astro";
 import Generating from "../Generating.astro";
+import { recentMerges, shortDate } from "../../lib/farm";
+
+// Receipts: real merges across the org's public repos, fetched at build
+// time. Omitted entirely when the API doesn't answer.
+const merges = await recentMerges(3);
 ---
 
 <Section id="operations">
@@ -10,6 +15,30 @@ import Generating from "../Generating.astro";
       title="The factory is running"
       text="Real automations. Real results. Right now — a look inside the farm."
     />
+
+    {
+      merges && (
+        <div class="mb-10">
+          <div class="tagline mb-3 text-n-4">Receipts · recent merges across the org</div>
+          <ul class="font-code text-xs leading-6 text-n-3">
+            {merges.map((merge) => (
+              <li class="flex items-baseline gap-3 py-2 border-t border-n-6 last:border-b min-w-0">
+                <a
+                  class="shrink-0 text-brand-cyan transition-colors hover:text-brand-magenta"
+                  href={merge.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {merge.repo}#{merge.number}
+                </a>
+                <span class="truncate">{merge.title}</span>
+                <span class="ml-auto shrink-0 text-n-4">{shortDate(merge.mergedAt)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )
+    }
 
     <div class="relative">
       {/* Big panel: operator control room with copy on the right */}

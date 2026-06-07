@@ -6,6 +6,25 @@ import Tagline from "../components/Tagline.astro";
 import Button from "../components/Button.astro";
 import { openSourceCatalog } from "../data/openSource";
 import { site } from "../data/site";
+import { gemInfo, compactNumber } from "../lib/farm";
+
+// Live version + download counts from RubyGems at build time; the static
+// version string is the fallback when the API doesn't answer.
+const catalog = await Promise.all(
+  openSourceCatalog.map(async (category) => ({
+    ...category,
+    repos: await Promise.all(
+      category.repos.map(async (repo) => {
+        const live = await gemInfo(repo.repo);
+        return {
+          ...repo,
+          version: live ? `v${live.version}` : repo.version,
+          downloads: live?.downloads ?? null,
+        };
+      })
+    ),
+  }))
+);
 ---
 
 <Layout
@@ -21,7 +40,7 @@ import { site } from "../data/site";
       />
 
       {
-        openSourceCatalog.map((category) => (
+        catalog.map((category) => (
           <div class="mb-15 last:mb-0">
             <h3 class="h4 mb-8">{category.title}</h3>
             <div class="grid gap-5 lg:grid-cols-2">
@@ -33,7 +52,10 @@ import { site } from "../data/site";
                   <div class="relative z-1 flex flex-col h-full">
                     <div class="flex items-center justify-between mb-4">
                       <Tagline>{repo.kind}</Tagline>
-                      <div class="tagline text-n-4">{repo.version}</div>
+                      <div class="tagline text-n-4">
+                        {repo.version}
+                        {repo.downloads ? ` · ${compactNumber(repo.downloads)} downloads` : ""}
+                      </div>
                     </div>
                     <h5 class="h6 mb-2">{repo.name}</h5>
                     <p class="body-2 mb-4 text-n-2">{repo.description}</p>
@@ -48,8 +70,18 @@ import { site } from "../data/site";
                         ))}
                       </ul>
                     )}
+                    <div class="flex items-center justify-between gap-3 mt-auto mb-4 px-4 py-2.5 bg-n-8 rounded-xl min-w-0">
+                      <code class="font-code text-xs text-n-3 truncate">gem install {repo.repo}</code>
+                      <button
+                        class="button shrink-0 text-n-4 cursor-pointer transition-colors hover:text-brand-magenta"
+                        data-copy={`gem install ${repo.repo}`}
+                        aria-label={`Copy install command for ${repo.name}`}
+                      >
+                        Copy
+                      </button>
+                    </div>
                     <a
-                      class="button inline-flex items-center mt-auto text-n-1 transition-colors hover:text-brand-magenta"
+                      class="button inline-flex items-center text-n-1 transition-colors hover:text-brand-magenta"
                       href={`https://github.com/rarebit-one/${repo.repo}`}
                       target="_blank"
                       rel="noreferrer"
@@ -73,3 +105,21 @@ import { site } from "../data/site";
     </div>
   </Section>
 </Layout>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const text = button.dataset.copy ?? "";
+      try {
+        await navigator.clipboard.writeText(text);
+        const label = button.textContent;
+        button.textContent = "Copied";
+        setTimeout(() => {
+          button.textContent = label;
+        }, 1500);
+      } catch {
+        /* clipboard unavailable — leave the text selectable */
+      }
+    });
+  });
+</script>
