@@ -13,4 +13,5 @@ packages:
         web: raw
         limits:
           timeout: 15000
-          memory: 256
+          # Stateless string-serving — 128MB halves the GiB-s per call.
+          memory: 128
