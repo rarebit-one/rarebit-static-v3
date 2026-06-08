@@ -12,12 +12,14 @@ const clients = [
   {
     id: "claude-code",
     title: "Claude Code",
+    icon: "/images/brands/claude.svg",
     instructions: "One command in your terminal:",
     snippet: `claude mcp add --transport http rarebit ${endpoint}`,
   },
   {
     id: "claude",
     title: "Claude (web & desktop)",
+    icon: "/images/brands/claude.svg",
     instructions:
       "Settings → Connectors → Add custom connector, then paste the endpoint:",
     snippet: endpoint,
@@ -25,6 +27,7 @@ const clients = [
   {
     id: "cursor",
     title: "Cursor",
+    icon: "/images/brands/cursor.svg",
     instructions: "Add to .cursor/mcp.json:",
     snippet: `{
   "mcpServers": {
@@ -35,6 +38,7 @@ const clients = [
   {
     id: "chatgpt",
     title: "ChatGPT",
+    icon: "/images/brands/openai.svg",
     instructions:
       "Settings → Apps & Connectors (developer mode) → Create, then paste the endpoint:",
     snippet: endpoint,
@@ -42,6 +46,7 @@ const clients = [
   {
     id: "generic",
     title: "Anything else",
+    icon: "/images/brands/mcp.svg",
     instructions:
       "Any MCP client that speaks Streamable HTTP can connect with this config:",
     snippet: `{
@@ -108,9 +113,14 @@ const tools = [
         {
           clients.map((client) => (
             <div class="flex flex-col min-w-0 p-5 border border-n-1/10 rounded-3xl bg-n-7 transition-colors hover:border-brand-cyan/30 md:p-8">
-              <h5 class="h6 mb-2">{client.title}</h5>
+              <div class="flex items-center mb-4">
+                <span class="flex items-center justify-center w-11 h-11 shrink-0 bg-n-6 rounded-xl">
+                  <img src={client.icon} width="24" height="24" alt="" />
+                </span>
+                <h5 class="h6 ml-4">{client.title}</h5>
+              </div>
               <p class="body-2 mb-4 text-n-4">{client.instructions}</p>
-              <div class="relative mt-auto">
+              <div class="relative">
                 <pre class="p-4 pr-14 bg-n-8 rounded-xl font-code text-xs leading-5 text-n-2 overflow-x-auto md:text-sm md:leading-6"><code>{client.snippet}</code></pre>
                 <button
                   class="button absolute top-3 right-3 px-2 py-1 text-n-4 cursor-pointer transition-colors hover:text-brand-magenta"
@@ -211,9 +221,58 @@ const tools = [
         </div>
       </div>
 
-      <p class="body-2 text-center text-n-4">
-        Prefer plain email? <a class="text-n-1 transition-colors hover:text-brand-magenta" href={`mailto:${site.email}`}>{site.email}</a>
-      </p>
+      {/* Closing CTA — the template's "Join" ring backdrop, reworded for MCP.
+          The endpoint is the whole point of the page, so the button copies it. */}
+      <div class="relative max-w-[43.125rem] mx-auto pt-4 pb-6 text-center md:pt-10 md:pb-14">
+        <div class="relative z-1">
+          <h2 class="h2 mb-6">
+            Point your AI at the{" "}
+            <span class="inline-block relative">
+              farm
+              <img
+                class="absolute top-full left-0 w-full"
+                src="/images/curve.png"
+                width="624"
+                height="28"
+                alt=""
+              />
+            </span>
+          </h2>
+          <p class="body-1 mb-8 text-n-4">
+            Add the server, ask how we work, and let your assistant scope the first workflow
+            worth automating — straight from the chat you already use.
+          </p>
+          <Button white data-copy={endpoint}><span data-copy-label>Copy MCP endpoint</span></Button>
+        </div>
+
+        <div
+          class="absolute top-1/2 left-1/2 w-[46.5rem] h-[46.5rem] border border-n-2/5 rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+        >
+          <div
+            class="absolute top-1/2 left-1/2 w-[39.25rem] h-[39.25rem] border border-n-2/10 rounded-full -translate-x-1/2 -translate-y-1/2"
+          >
+          </div>
+          <div
+            class="absolute top-1/2 left-1/2 w-[30.625rem] h-[30.625rem] border border-n-2/10 rounded-full -translate-x-1/2 -translate-y-1/2"
+          >
+          </div>
+          <div
+            class="absolute top-1/2 left-1/2 w-[21.5rem] h-[21.5rem] border border-n-2/10 rounded-full -translate-x-1/2 -translate-y-1/2"
+          >
+          </div>
+          <div
+            class="absolute top-1/2 left-1/2 w-[13.75rem] h-[13.75rem] border border-n-2/10 rounded-full -translate-x-1/2 -translate-y-1/2"
+          >
+          </div>
+        </div>
+        <div
+          class="absolute top-1/2 left-1/2 w-[46.5rem] h-[46.5rem] -translate-x-1/2 -translate-y-1/2 opacity-60 mix-blend-color-dodge pointer-events-none"
+        >
+          <div class="absolute top-1/2 left-1/2 w-[58.85rem] h-[58.85rem] -translate-x-3/4 -translate-y-1/2">
+            <img class="w-full" src="/images/gradient.webp" width="942" height="942" alt="" />
+          </div>
+        </div>
+      </div>
     </div>
   </Section>
 </Layout>
@@ -267,10 +326,13 @@ const tools = [
       const text = button.dataset.copy ?? "";
       try {
         await navigator.clipboard.writeText(text);
-        const label = button.textContent;
-        button.textContent = "Copied";
+        // Update only the label span when present (the chrome Button keeps its
+        // SVG border as siblings) — otherwise the plain button's own text.
+        const label = button.querySelector<HTMLElement>("[data-copy-label]") ?? button;
+        const original = label.textContent;
+        label.textContent = "Copied";
         setTimeout(() => {
-          button.textContent = label;
+          label.textContent = original;
         }, 1500);
       } catch {
         /* clipboard unavailable — leave the text selectable */
