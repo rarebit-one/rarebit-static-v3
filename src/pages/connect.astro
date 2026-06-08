@@ -311,10 +311,10 @@ const tools = [
         return;
       }
       status.textContent =
-        payload.error ?? "Something went wrong — please email us instead.";
+        payload.error ?? "Something went wrong — please try again.";
     } catch {
       status.textContent =
-        "Could not reach the inbox — please email us instead.";
+        "Could not reach the inbox — please try again, or add the MCP server above.";
     } finally {
       submit.disabled = false;
       if (label) label.textContent = idle;
