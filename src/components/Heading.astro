@@ -7,6 +7,9 @@ interface Props {
   tag?: string;
   title?: string;
   text?: string;
+  /** Title level — 1 for a page's lead heading, 2 (default) for section
+      headings. Visual size stays the .h2 scale either way. */
+  level?: 1 | 2;
 }
 
 const {
@@ -15,12 +18,15 @@ const {
   tag,
   title,
   text,
+  level = 2,
 } = Astro.props;
+
+const TitleTag = `h${level}` as const;
 ---
 
 <div class={`max-w-[50rem] mx-auto mb-12 ${textAlignClass} lg:mb-20 ${className}`}>
   {tag && <Tagline class="mb-4 md:justify-center">{tag}</Tagline>}
-  {title && <h2 class="h2">{title}</h2>}
+  {title && <TitleTag class="h2">{title}</TitleTag>}
   {text && <p class="body-2 mt-4 text-n-4">{text}</p>}
   <slot />
 </div>
