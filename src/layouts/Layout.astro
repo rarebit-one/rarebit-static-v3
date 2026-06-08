@@ -15,10 +15,25 @@ import { site } from "../data/site";
 interface Props {
   title?: string;
   description?: string;
+  /** Non-indexable pages (e.g. 404): emit robots noindex and skip the
+      self-canonical, which would otherwise point at a non-routable URL. */
+  noindex?: boolean;
 }
 
-const { title = site.title, description = site.description } = Astro.props;
+const { title = site.title, description = site.description, noindex = false } = Astro.props;
 const ogImage = new URL("/images/rarebit/dashboard-factory.webp", Astro.site);
+const ogImageAlt = "Rarebit automation farm — live operations dashboard";
+const canonical = new URL(Astro.url.pathname, Astro.site);
+
+const organizationLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: site.name,
+  url: new URL("/", Astro.site).href,
+  logo: new URL("/images/rarebit/logo.webp", Astro.site).href,
+  description: site.description,
+  sameAs: [site.github],
+};
 ---
 
 <!doctype html>
@@ -28,23 +43,38 @@ const ogImage = new URL("/images/rarebit/dashboard-factory.webp", Astro.site);
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    {noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={canonical} />}
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="sitemap" href="/sitemap-index.xml" />
     <meta name="theme-color" content="#0e0c15" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
+    {!noindex && <meta property="og:url" content={canonical} />}
     <meta property="og:site_name" content={site.name} />
     <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1536" />
+    <meta property="og:image:height" content="1024" />
+    <meta property="og:image:alt" content={ogImageAlt} />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content={ogImageAlt} />
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(organizationLd)} />
   </head>
   <body class="font-sans bg-n-8 text-n-1 text-base tap-highlight-color">
+    <a
+      href="#main-content"
+      class="button sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-n-1 focus:text-n-8 focus:rounded-lg"
+    >
+      Skip to content
+    </a>
     <div class="pt-[4.75rem] lg:pt-[5.25rem] overflow-hidden">
       <Header />
-      <slot />
+      <main id="main-content" tabindex="-1" class="outline-none">
+        <slot />
+      </main>
       <Footer />
     </div>
 

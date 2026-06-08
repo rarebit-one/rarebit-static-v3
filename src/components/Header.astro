@@ -12,6 +12,8 @@ import { navigation, site } from "../data/site";
     <Logo class="xl:mr-8" />
 
     <nav
+      id="primary-nav"
+      aria-label="Primary"
       class="hidden fixed top-[4.8125rem] left-0 right-0 bottom-0 bg-n-8 lg:static lg:flex lg:mx-auto lg:bg-transparent"
       data-nav
     >
@@ -40,6 +42,8 @@ import { navigation, site } from "../data/site";
             src="/images/header/background.webp"
             width="688"
             height="953"
+            loading="lazy"
+            decoding="async"
             alt=""
           />
         </div>
@@ -84,8 +88,15 @@ import { navigation, site } from "../data/site";
         after .hidden, so the Button's base inline-flex would win on mobile */}
     <Button class="max-lg:hidden" href="/connect">Connect</Button>
 
-    <Button class="ml-auto lg:hidden" px="px-3" data-nav-toggle>
-      <svg class="overflow-visible" width="20" height="12" viewBox="0 0 20 12">
+    <Button
+      class="ml-auto lg:hidden"
+      px="px-3"
+      data-nav-toggle
+      aria-label="Open menu"
+      aria-controls="primary-nav"
+      aria-expanded="false"
+    >
+      <svg class="overflow-visible" width="20" height="12" viewBox="0 0 20 12" aria-hidden="true">
         <rect class="transition-all origin-center" y="0" width="20" height="2" rx="1" fill="white"
         ></rect>
         <rect class="transition-all origin-center" y="10" width="20" height="2" rx="1" fill="white"
@@ -105,6 +116,8 @@ import { navigation, site } from "../data/site";
 
   const setOpen = (next: boolean) => {
     open = next;
+    toggle?.setAttribute("aria-expanded", String(open));
+    toggle?.setAttribute("aria-label", open ? "Close menu" : "Open menu");
     nav?.classList.toggle("hidden", !open);
     nav?.classList.toggle("flex", open);
     // Swap (not stack) the header surface like the template: solid when the
@@ -123,5 +136,12 @@ import { navigation, site } from "../data/site";
   toggle?.addEventListener("click", () => setOpen(!open));
   nav?.querySelectorAll("[data-nav-link]").forEach((link) => {
     link.addEventListener("click", () => setOpen(false));
+  });
+  // Escape closes the mobile menu and returns focus to the toggle.
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && open) {
+      setOpen(false);
+      (toggle as HTMLElement | undefined)?.focus();
+    }
   });
 </script>
