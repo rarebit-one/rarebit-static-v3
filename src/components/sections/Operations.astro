@@ -247,6 +247,25 @@ const freshDigest = (() => {
   const list = feed?.querySelector<HTMLUListElement>("[data-feed-list]");
   const label = feed?.querySelector<HTMLElement>("[data-feed-label]");
   const dot = feed?.querySelector<HTMLElement>("[data-feed-dot]");
+  const digestEl = feed?.querySelector<HTMLElement>("[data-feed-digest]");
+
+  // Reconcile the SSR-frozen digest line with the live artifact: a build can
+  // be days old (weekly rebuild), so the client owns this text at runtime —
+  // refresh it from a fresh feed, hide it when the feed is stale/absent.
+  const setDigest = (text: string | null) => {
+    if (!digestEl) return;
+    if (!text) {
+      digestEl.classList.add("hidden");
+      return;
+    }
+    digestEl.textContent = "";
+    digestEl.append(`Client work · ${text} `);
+    const tag = document.createElement("span");
+    tag.className = "text-n-4/50";
+    tag.textContent = "(replayed on a 24h delay)";
+    digestEl.append(tag);
+    digestEl.classList.remove("hidden");
+  };
 
   // `at` is the DISPLAY time: real timestamp for public events, real+24h for
   // replayed client events. `url` is absent on client rows (no link). The
@@ -486,7 +505,13 @@ const freshDigest = (() => {
       const response = await fetch(url, { cache: "no-store" });
       if (!response.ok) return;
       const data = await response.json();
-      if (!Array.isArray(data?.events) || data.window !== yesterdaySgt()) return; // stale → digest only
+      if (!Array.isArray(data?.events) || data.window !== yesterdaySgt()) {
+        // Stale or malformed → hide the build-frozen digest rather than leave
+        // a days-old line labelled "24h delay".
+        setDigest(null);
+        return;
+      }
+      setDigest(typeof data.digest === "string" ? data.digest : null);
       replayItems = [];
       schedule_ = data.events
         .map((event: any) => {
