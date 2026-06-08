@@ -11,8 +11,16 @@ const merges = await recentMerges(5);
 
 // Client-work replay digest, fetched at build for the no-JS fallback line.
 // The client script does the live 24h-delayed replay; this is the summary
-// a JS-less visitor (or one whose feed is stale) still sees.
+// a JS-less visitor (or one whose feed is stale) still sees. Same freshness
+// rule as the client: only show the digest if the build-time file's window
+// is within the last two days (SGT) — a frozen build must not surface a
+// week-old digest as current.
 const replay = await farmReplay();
+const freshDigest = (() => {
+  if (!replay?.window) return null;
+  const days = (Date.now() - Date.parse(`${replay.window}T00:00:00+08:00`)) / 86_400_000;
+  return days >= 0 && days <= 2 ? replay.digest : null;
+})();
 ---
 
 <Section id="operations">
@@ -51,9 +59,9 @@ const replay = await farmReplay();
               </li>
             ))}
           </ul>
-          {replay?.digest && (
+          {freshDigest && (
             <p class="caption mt-3 text-n-4/70" data-feed-digest>
-              Client work · {replay.digest} <span class="text-n-4/50">(replayed on a 24h delay)</span>
+              Client work · {freshDigest} <span class="text-n-4/50">(replayed on a 24h delay)</span>
             </p>
           )}
         </div>
@@ -431,12 +439,44 @@ const replay = await farmReplay();
   // late. Freshness guard: only replay when the file's window is yesterday
   // (SGT) — never present stale data as "just now".
   const DELAY_MS = 86_400_000;
+  type Scheduled = { id: string; text: string; displayAt: number; revealed: boolean };
+  let schedule_: Scheduled[] = [];
   const timeouts: number[] = [];
 
   const yesterdaySgt = () => {
     const sgt = new Date(Date.now() + 8 * 3600_000);
     sgt.setUTCDate(sgt.getUTCDate() - 1);
     return sgt.toISOString().slice(0, 10);
+  };
+
+  // Reveal every event now past its +24h mark, (re-)render, and arm a timeout
+  // for the next near-future one so it pops in live. Called on load, on each
+  // 60s poll tick (so a long-open tab keeps ticking past the first 30 min),
+  // and on tab refocus.
+  const tickReplay = () => {
+    timeouts.forEach(clearTimeout);
+    timeouts.length = 0;
+    let revealedAny = false;
+    let next = Infinity;
+    for (const s of schedule_) {
+      const wait = s.displayAt - Date.now();
+      if (wait <= 0) {
+        if (!s.revealed) {
+          s.revealed = true;
+          replayItems.push({ id: s.id, who: "client", text: s.text, at: s.displayAt });
+          revealedAny = true;
+        }
+      } else {
+        next = Math.min(next, wait);
+      }
+    }
+    if (revealedAny) {
+      goLive();
+      render();
+    }
+    if (next !== Infinity) {
+      timeouts.push(window.setTimeout(tickReplay, Math.min(next, 60_000) + 50));
+    }
   };
 
   const loadReplay = async () => {
@@ -447,34 +487,21 @@ const replay = await farmReplay();
       if (!response.ok) return;
       const data = await response.json();
       if (!Array.isArray(data?.events) || data.window !== yesterdaySgt()) return; // stale → digest only
-      timeouts.forEach(clearTimeout);
-      timeouts.length = 0;
       replayItems = [];
-
-      const reveal = (event: any, displayAt: number) => {
-        replayItems.push({
-          id: `replay-${event.at}`,
-          who: "client",
-          text: String(event.text ?? "").slice(0, 80),
-          at: displayAt,
-        });
-        goLive();
-        render();
-      };
-
-      for (const event of data.events) {
-        const real = Date.parse(event.at);
-        if (Number.isNaN(real)) continue;
-        const displayAt = real + DELAY_MS;
-        const wait = displayAt - Date.now();
-        if (wait <= 0) {
-          reveal(event, displayAt); // already elapsed — show immediately
-        } else if (wait < 30 * 60_000) {
-          // Schedule the next half-hour of reveals so the lane pops live
-          // while someone watches; further-out events reveal on reload.
-          timeouts.push(window.setTimeout(() => reveal(event, displayAt), wait));
-        }
-      }
+      schedule_ = data.events
+        .map((event: any) => {
+          const real = Date.parse(event.at);
+          return Number.isNaN(real)
+            ? null
+            : {
+                id: `replay-${event.at}`,
+                text: String(event.text ?? "").slice(0, 80),
+                displayAt: real + DELAY_MS,
+                revealed: false,
+              };
+        })
+        .filter(Boolean) as Scheduled[];
+      tickReplay();
     } catch {
       /* feed unreachable — SSR digest line stays */
     }
@@ -483,7 +510,10 @@ const replay = await farmReplay();
   const schedule = () => {
     clearInterval(timer);
     timer = window.setInterval(() => {
-      if (!document.hidden) poll();
+      if (!document.hidden) {
+        poll();
+        tickReplay(); // keep the lane ticking past the first near-future window
+      }
     }, 60_000);
   };
 

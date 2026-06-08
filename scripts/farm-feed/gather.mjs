@@ -73,6 +73,14 @@ async function main() {
   const repos = await gh(`/orgs/${ORG}/repos?type=private&per_page=100`);
   const members = await gh(`/orgs/${ORG}/members?per_page=100`).catch(() => []);
 
+  // The blocklist is defense-in-depth (the LLM never sees raw names anyway),
+  // but flag truncation so we don't assume full coverage. >100 repos/members,
+  // or an empty members list from a metadata-only PAT, means some identifiers
+  // aren't on the blocklist — the validator still gates URLs/numbers/emails.
+  if (repos.length === 100) console.log("gather: WARNING repos hit per_page=100 — blocklist may be incomplete");
+  if (Array.isArray(members) && members.length === 100) console.log("gather: WARNING members hit per_page=100 — blocklist may be incomplete");
+  if (!Array.isArray(members) || members.length === 0) console.log("gather: note — no org members fetched (PAT scope?); logins absent from blocklist");
+
   const blocklist = [
     ...repos.map((r) => r.name),
     ...repos.map((r) => r.full_name),

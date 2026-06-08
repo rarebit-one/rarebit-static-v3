@@ -59,7 +59,14 @@ jobs:
             exit 0
           fi
           node scripts/farm-feed/validate.mjs sanitized.json phrased.json farm-replay.json
-          echo "publish=true" >> "$GITHUB_OUTPUT"
+          # validate exits 0 without writing the artifact on an empty day —
+          # only publish when it actually produced one.
+          if [ -f farm-replay.json ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No artifact produced (empty window) — skipping publish."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Publish to Spaces
         if: steps.validate.outputs.publish == 'true'

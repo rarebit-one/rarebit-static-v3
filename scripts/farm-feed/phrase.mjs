@@ -14,7 +14,7 @@
 // Input:  argv[2] (default ./sanitized.json)
 // Output: argv[3] (default ./phrased.json) — { digest, phrases: {cat: [...]} }
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const IN = process.argv[2] ?? "sanitized.json";
 const OUT = process.argv[3] ?? "phrased.json";
@@ -22,6 +22,11 @@ const KEY = process.env.ANTHROPIC_API_KEY;
 
 if (!KEY) {
   console.log("phrase: ANTHROPIC_API_KEY not set — skipping (graceful no-op).");
+  process.exit(0);
+}
+if (!existsSync(IN)) {
+  // gather.mjs no-op'd (no FEED_GITHUB_PAT) — nothing to phrase. Stay green.
+  console.log(`phrase: ${IN} absent (gather skipped) — skipping (graceful no-op).`);
   process.exit(0);
 }
 

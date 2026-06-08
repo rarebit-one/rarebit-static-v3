@@ -82,7 +82,13 @@ const events = (sanitized.events ?? []).map((event) => {
   };
 });
 
-if (events.length === 0) fail("no events to publish");
+// An empty day (weekend, holiday) is benign — skip publish without failing.
+// `fail()` (exit 1) is reserved for actual policy violations, which SHOULD
+// page someone. Yesterday's published artifact simply stands.
+if (events.length === 0) {
+  console.log("validate: no events for this window — skipping publish (not a rejection).");
+  process.exit(0);
+}
 
 const artifact = {
   generated: new Date().toISOString(),
