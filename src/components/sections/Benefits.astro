@@ -13,10 +13,12 @@ import { benefits } from "../../data/site";
     />
 
     {/* Scroll-snap carousel — the CSS stand-in for the template's Splide.
-        Bleeds past the container on mobile (both edges) and to the right
-        viewport edge on md+, like the template's splide-visible overflow. */}
+        Bleeds past the container to both viewport edges (mobile and md+), so
+        slides run to the screen edge instead of clipping at the container.
+        The negative margins pull the track to the viewport edges; the matching
+        padding + scroll-padding keep the first slide resting under the heading. */}
     <div
-      class="flex gap-6 overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar -ml-5 pl-5 -mr-5 pr-5 scroll-px-5 md:ml-0 md:pl-0 md:mr-[calc(50%-50vw)] md:pr-0 md:scroll-px-0 md:cursor-grab"
+      class="flex gap-6 overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar -ml-5 pl-5 -mr-5 pr-5 scroll-px-5 md:ml-[calc(50%-50vw)] md:pl-[calc(50vw-50%)] md:mr-[calc(50%-50vw)] md:pr-0 md:cursor-grab"
       data-benefits-track
     >
       {
@@ -102,6 +104,18 @@ import { benefits } from "../../data/site";
     // track's scroll origin — subtract the first slide's offset so positions
     // are comparable with scrollLeft.
     const slideLeft = (index: number) => slides[index].offsetLeft - slides[0].offsetLeft;
+
+    // The track bleeds to both viewport edges, so its left padding is the
+    // lead-in that rests the first slide under the heading. scroll-padding
+    // can't reuse the CSS `calc(50vw - 50%)` (its % resolves against the
+    // full-width scrollport, not the container, so it collapses to 0) — so
+    // mirror the already-resolved padding-left onto scroll-padding-left,
+    // which keeps every slide snapping flush under the heading at any width.
+    const syncScrollPadding = () => {
+      track.style.scrollPaddingLeft = getComputedStyle(track).paddingLeft;
+    };
+    syncScrollPadding();
+    window.addEventListener("resize", syncScrollPadding, { passive: true });
 
     const setActive = (active: number) => {
       dots.forEach((dot, index) => {
