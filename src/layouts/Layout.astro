@@ -15,9 +15,12 @@ import { site } from "../data/site";
 interface Props {
   title?: string;
   description?: string;
+  /** Non-indexable pages (e.g. 404): emit robots noindex and skip the
+      self-canonical, which would otherwise point at a non-routable URL. */
+  noindex?: boolean;
 }
 
-const { title = site.title, description = site.description } = Astro.props;
+const { title = site.title, description = site.description, noindex = false } = Astro.props;
 const ogImage = new URL("/images/rarebit/dashboard-factory.webp", Astro.site);
 const ogImageAlt = "Rarebit automation farm — live operations dashboard";
 const canonical = new URL(Astro.url.pathname, Astro.site);
@@ -40,14 +43,14 @@ const organizationLd = {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <link rel="canonical" href={canonical} />
+    {noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={canonical} />}
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="sitemap" href="/sitemap-index.xml" />
     <meta name="theme-color" content="#0e0c15" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content={canonical} />
+    {!noindex && <meta property="og:url" content={canonical} />}
     <meta property="og:site_name" content={site.name} />
     <meta property="og:image" content={ogImage} />
     <meta property="og:image:width" content="1536" />
