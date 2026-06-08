@@ -61,6 +61,25 @@ npm run preview  # serve dist/
   construction (unauthenticated API). The SSR receipts remain the no-JS fallback. NB: the
   org-events payloads are slim (no html_url, no merged flag, no push sizes) — URLs are
   constructed, and closed PRs say "closed", never "merged".
+- **Client-work replay lane** — the Operations feed also interleaves a `client` lane that
+  **replays yesterday's private-repo activity on a fixed 24h delay** (disclosed in the lane
+  header + a `Δ24h` row marker, like a delayed market ticker). A nightly pipeline
+  (`scripts/farm-feed/`, `farm-feed.yml`, 00:30 SGT) is a strict **gather → phrase → validate**
+  sandwich: `gather.mjs` reads private workflow runs and reduces them to category counts +
+  timestamps **inside the script** (repo names, branches, logins never leave it); `phrase.mjs`
+  makes the **one** LLM call (`claude-haiku-4-5`) producing only a digest line + generic
+  per-category phrase templates — it never sees raw data or emits identifiers; `validate.mjs`
+  is a hard gate that **exit-1s on any blocklisted name, URL, email, @handle, or number absent
+  from the sanitized totals**, then assembles the artifact from the validated templates. Output
+  publishes to a DO Spaces bucket (`rarebit-farm-feed`, channel from the `FARM_FEED_CHANNEL`
+  repo var — `staging` until trusted, then `live`); the site reads it at build (`farmReplay()`
+  → SSR digest line) and in the browser (reveal each event at real-time+24h; **freshness guard**:
+  replay only when the file's `window` is yesterday-SGT, else digest-only — never present stale
+  data as fresh). **Invariants, do not weaken:** the LLM phrases, it does not redact; the
+  validator is the gate; nothing is ever shown sooner than 24h. Secrets (user-created):
+  `FEED_GITHUB_PAT`, `ANTHROPIC_API_KEY`, `SPACES_KEY_ID`, `SPACES_SECRET` — each missing one
+  no-ops its step so the workflow stays green until wired up. Publishing anonymized aggregate
+  client activity is gated on a contracts check (rarebit-ops) before flipping to `live`.
 - **Legal footer** (name, UEN, registered address) mirrors `rarebit-ops` `entity/profile.yml` —
   that file is the source of truth; update here when ACRA details change.
 - **Contact is MCP-first, form-fallback.** All CTAs route to `/connect`, which documents the

@@ -1,0 +1,13 @@
+{
+  "window": "2026-06-07",
+  "totals": { "runs": 23, "systems": 4, "greenPct": 96 },
+  "categories": ["deploy", "tests", "scheduled job", "data pipeline"],
+  "events": [
+    { "at": "2026-06-07T01:14:22.000Z", "category": "scheduled job", "ok": true, "count": 1 },
+    { "at": "2026-06-07T03:31:07.000Z", "category": "tests", "ok": true, "count": 6 },
+    { "at": "2026-06-07T05:02:40.000Z", "category": "deploy", "ok": true, "count": 1 },
+    { "at": "2026-06-07T06:48:11.000Z", "category": "data pipeline", "ok": false, "count": 1 },
+    { "at": "2026-06-07T09:20:55.000Z", "category": "tests", "ok": true, "count": 3 }
+  ],
+  "blocklist": ["acme-payments", "rarebit-one/acme-payments", "octocat", "ada-eng"]
+}

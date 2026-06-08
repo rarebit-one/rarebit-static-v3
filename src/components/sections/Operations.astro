@@ -2,12 +2,17 @@
 import Section from "../Section.astro";
 import Heading from "../Heading.astro";
 import Generating from "../Generating.astro";
-import { recentMerges, shortDate } from "../../lib/farm";
+import { recentMerges, shortDate, farmReplay, FARM_FEED_URL } from "../../lib/farm";
 
 // Receipts: real merges across the org's public repos, fetched at build
 // time. Omitted entirely when the API doesn't answer. Five rows so the
 // client-side live upgrade (up to 8) doesn't grow the section as sharply.
 const merges = await recentMerges(5);
+
+// Client-work replay digest, fetched at build for the no-JS fallback line.
+// The client script does the live 24h-delayed replay; this is the summary
+// a JS-less visitor (or one whose feed is stale) still sees.
+const replay = await farmReplay();
 ---
 
 <Section id="operations">
@@ -25,7 +30,7 @@ const merges = await recentMerges(5);
          unauthenticated rate limit). Actors are anonymized to agent/operator;
          only event type, repo, and number are ever rendered. */
       merges && (
-        <div class="mb-10" data-farm-feed>
+        <div class="mb-10" data-farm-feed data-replay-url={FARM_FEED_URL}>
           <div class="flex items-center gap-2 mb-3">
             <span class="hidden w-2 h-2 rounded-full bg-brand-cyan live-dot" data-feed-dot></span>
             <span class="tagline text-n-4" data-feed-label>Receipts · recent merges across the org</span>
@@ -46,6 +51,11 @@ const merges = await recentMerges(5);
               </li>
             ))}
           </ul>
+          {replay?.digest && (
+            <p class="caption mt-3 text-n-4/70" data-feed-digest>
+              Client work · {replay.digest} <span class="text-n-4/50">(replayed on a 24h delay)</span>
+            </p>
+          )}
         </div>
       )
     }
@@ -230,12 +240,16 @@ const merges = await recentMerges(5);
   const label = feed?.querySelector<HTMLElement>("[data-feed-label]");
   const dot = feed?.querySelector<HTMLElement>("[data-feed-dot]");
 
-  type FeedItem = { id: string; who: "agent" | "operator"; text: string; url: string; at: number };
+  // `at` is the DISPLAY time: real timestamp for public events, real+24h for
+  // replayed client events. `url` is absent on client rows (no link). The
+  // chip is agent (bot) / operator (human) for public, client for replay.
+  type FeedItem = { id: string; who: "agent" | "operator" | "client"; text: string; url?: string; at: number };
 
   const EVENTS_URL = "https://api.github.com/orgs/rarebit-one/events?per_page=30";
   const MAX_ROWS = 8;
   let etag = "";
-  let items: FeedItem[] = [];
+  let items: FeedItem[] = []; // public events
+  let replayItems: FeedItem[] = []; // client events already past their +24h reveal
   const seen = new Set<string>();
   let timer = 0;
 
@@ -295,37 +309,52 @@ const merges = await recentMerges(5);
     }
   };
 
+  const chipColor = {
+    agent: "text-brand-cyan",
+    operator: "text-brand-magenta",
+    client: "text-color-2",
+  } as const;
+
   const render = () => {
     if (!list) return;
+    // Interleave public + revealed client events by display time, newest first.
+    const rows = [...items, ...replayItems]
+      .sort((a, b) => b.at - a.at)
+      .slice(0, MAX_ROWS);
+
     list.textContent = "";
-    for (const item of items) {
+    for (const item of rows) {
       const li = document.createElement("li");
       li.className = "flex items-baseline gap-3 py-2 border-t border-n-6 last:border-b min-w-0";
       if (!seen.has(item.id)) li.classList.add("feed-enter");
 
       const chip = document.createElement("span");
-      const agent = item.who === "agent";
-      chip.className = `shrink-0 w-[4.5rem] uppercase tracking-wider ${agent ? "text-brand-cyan" : "text-brand-magenta"}`;
+      chip.className = `shrink-0 w-[4.5rem] uppercase tracking-wider ${chipColor[item.who]}`;
       chip.textContent = item.who;
 
-      const link = document.createElement("a");
-      link.className = "truncate text-n-3 transition-colors hover:text-n-1";
-      link.href = item.url;
-      link.target = "_blank";
-      link.rel = "noreferrer";
-      link.textContent = item.text;
+      // Public rows link to GitHub; client rows are unlinked (no URL exists).
+      const body = item.url ? document.createElement("a") : document.createElement("span");
+      body.className = "truncate text-n-3";
+      body.textContent = item.text;
+      if (item.url && body instanceof HTMLAnchorElement) {
+        body.classList.add("transition-colors", "hover:text-n-1");
+        body.href = item.url;
+        body.target = "_blank";
+        body.rel = "noreferrer";
+      }
 
       const time = document.createElement("span");
       time.className = "ml-auto shrink-0 text-n-4";
-      time.textContent = ago(item.at);
+      // Δ24h marks the replayed (delayed) lane, like a ticker's "delayed" tag.
+      time.textContent = item.who === "client" ? `${ago(item.at)} · Δ24h` : ago(item.at);
 
-      li.append(chip, link, time);
+      li.append(chip, body, time);
       list.append(li);
     }
     // Track only the current window — `seen` exists to gate the entrance
     // animation, not to remember history (it would grow for the tab's life).
     seen.clear();
-    items.forEach((item) => seen.add(item.id));
+    rows.forEach((item) => seen.add(item.id));
   };
 
   // Single poll in flight — the interval and visibilitychange can otherwise
@@ -378,13 +407,76 @@ const merges = await recentMerges(5);
         if (items.length >= MAX_ROWS) break;
       }
       if (items.length === 0) return; // keep SSR receipts
-      if (label) label.textContent = "Live from the farm · public org activity";
-      dot?.classList.remove("hidden");
+      goLive();
       render();
     } catch {
       /* network blocked — the SSR receipts stay */
     } finally {
       inFlight = false;
+    }
+  };
+
+  let live = false;
+  const goLive = () => {
+    if (live) return;
+    live = true;
+    if (label) label.textContent = "Live from the farm · public activity + client lane (replayed · 24h delay)";
+    dot?.classList.remove("hidden");
+  };
+
+  // --- Client-work replay: yesterday's events, each revealed at at+24h ----
+  // The nightly pipeline publishes an anonymized, generic-language replay to
+  // Spaces. We reveal each event when its real time + 24h has elapsed, so the
+  // lane ticks live without ever showing client activity sooner than a day
+  // late. Freshness guard: only replay when the file's window is yesterday
+  // (SGT) — never present stale data as "just now".
+  const DELAY_MS = 86_400_000;
+  const timeouts: number[] = [];
+
+  const yesterdaySgt = () => {
+    const sgt = new Date(Date.now() + 8 * 3600_000);
+    sgt.setUTCDate(sgt.getUTCDate() - 1);
+    return sgt.toISOString().slice(0, 10);
+  };
+
+  const loadReplay = async () => {
+    const url = feed?.dataset.replayUrl;
+    if (!url) return;
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!Array.isArray(data?.events) || data.window !== yesterdaySgt()) return; // stale → digest only
+      timeouts.forEach(clearTimeout);
+      timeouts.length = 0;
+      replayItems = [];
+
+      const reveal = (event: any, displayAt: number) => {
+        replayItems.push({
+          id: `replay-${event.at}`,
+          who: "client",
+          text: String(event.text ?? "").slice(0, 80),
+          at: displayAt,
+        });
+        goLive();
+        render();
+      };
+
+      for (const event of data.events) {
+        const real = Date.parse(event.at);
+        if (Number.isNaN(real)) continue;
+        const displayAt = real + DELAY_MS;
+        const wait = displayAt - Date.now();
+        if (wait <= 0) {
+          reveal(event, displayAt); // already elapsed — show immediately
+        } else if (wait < 30 * 60_000) {
+          // Schedule the next half-hour of reveals so the lane pops live
+          // while someone watches; further-out events reveal on reload.
+          timeouts.push(window.setTimeout(() => reveal(event, displayAt), wait));
+        }
+      }
+    } catch {
+      /* feed unreachable — SSR digest line stays */
     }
   };
 
@@ -397,9 +489,13 @@ const merges = await recentMerges(5);
 
   if (feed && list) {
     poll();
+    loadReplay();
     schedule();
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) poll();
+      if (!document.hidden) {
+        poll();
+        loadReplay();
+      }
     });
   }
 </script>

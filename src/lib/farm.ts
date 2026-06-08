@@ -10,6 +10,25 @@
 const TIMEOUT_MS = 8000;
 const ORG = "rarebit-one";
 
+// The client-work replay feed (nightly pipeline → DO Spaces). The site reads
+// the same URL at build (SSR digest fallback) and in the browser (live
+// replay). Channel is baked at build via PUBLIC_FARM_FEED_CHANNEL (default
+// "staging" until the pipeline is trusted; flip to "live" in prod env).
+const FARM_FEED_CHANNEL = import.meta.env.PUBLIC_FARM_FEED_CHANNEL ?? "staging";
+export const FARM_FEED_URL = `https://rarebit-farm-feed.sgp1.digitaloceanspaces.com/${FARM_FEED_CHANNEL}/farm-replay.json`;
+
+export type FarmReplay = {
+  generated: string;
+  window: string;
+  digest: string;
+  events: Array<{ at: string; kind: string; text: string; ok: boolean }>;
+};
+
+/** The replay artifact, fetched at build time for the SSR digest line. */
+export function farmReplay(): Promise<FarmReplay | null> {
+  return memoized("farm-replay", () => fetchJson<FarmReplay>(FARM_FEED_URL));
+}
+
 const memo = new Map<string, Promise<unknown>>();
 function memoized<T>(key: string, fn: () => Promise<T>): Promise<T> {
   if (!memo.has(key)) memo.set(key, fn());
