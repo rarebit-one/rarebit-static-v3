@@ -1,6 +1,5 @@
 import rss from "@astrojs/rss";
 import { getCollection } from "astro:content";
-import { site } from "../data/site";
 
 export async function GET(context) {
   const notes = await getCollection("notes");
@@ -17,6 +16,6 @@ export async function GET(context) {
         pubDate: note.data.pubDate,
         link: `/notes/${note.id}/`,
       })),
-    customData: `<language>en</language><managingEditor>${site.email} (Rarebit)</managingEditor>`,
+    customData: `<language>en</language>`,
   });
 }

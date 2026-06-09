@@ -24,5 +24,5 @@ Tools: how_we_work, open_source, intake_questionnaire, submit_inquiry.
 ## Entity
 
 RAREBIT ONE (UEN 53503079K) — 60 Paya Lebar Road, #06-28, Paya Lebar Square,
-Singapore 409051. Email: hello@rarebit.one · GitHub:
+Singapore 409051. Contact: https://rarebit.one/connect · GitHub:
 https://github.com/rarebit-one
