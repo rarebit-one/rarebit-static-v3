@@ -1,0 +1,88 @@
+name: Farm feed
+
+# Nightly client-work replay pipeline (00:30 SGT / 16:30 UTC):
+# gather (private workflow runs, deterministically anonymized) → phrase
+# (one Haiku call, generic templates only) → validate (hard gate on any
+# leaked identifier) → publish JSON to a DO Spaces bucket. The site replays
+# yesterday's events on a 24h delay. See scripts/farm-feed/*.
+#
+# Channel: the FARM_FEED_CHANNEL repo variable (default "staging") keys the
+# object path — flip to "live" once the staging output has been eyeballed.
+#
+# Missing any secret → the relevant step no-ops (exit 0) and publish is
+# skipped, so the workflow stays green until all four are wired up:
+#   FEED_GITHUB_PAT · ANTHROPIC_API_KEY · SPACES_KEY_ID · SPACES_SECRET
+
+on:
+  schedule:
+    - cron: "30 16 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: farm-feed
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FEED_GITHUB_PAT: ${{ secrets.FEED_GITHUB_PAT }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      SPACES_KEY_ID: ${{ secrets.SPACES_KEY_ID }}
+      SPACES_SECRET: ${{ secrets.SPACES_SECRET }}
+      BUCKET: rarebit-farm-feed
+      SPACES_ENDPOINT: https://sgp1.digitaloceanspaces.com
+      CHANNEL: ${{ vars.FARM_FEED_CHANNEL || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Gather (anonymize private workflow runs)
+        run: node scripts/farm-feed/gather.mjs sanitized.json
+
+      - name: Phrase (one LLM call — generic templates)
+        run: node scripts/farm-feed/phrase.mjs sanitized.json phrased.json
+
+      - name: Validate + assemble (hard gate)
+        id: validate
+        run: |
+          if [ ! -f phrased.json ]; then
+            echo "phrased.json absent (secrets not yet wired) — skipping publish."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          node scripts/farm-feed/validate.mjs sanitized.json phrased.json farm-replay.json
+          # validate exits 0 without writing the artifact on an empty day —
+          # only publish when it actually produced one.
+          if [ -f farm-replay.json ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No artifact produced (empty window) — skipping publish."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to Spaces
+        if: steps.validate.outputs.publish == 'true'
+        run: |
+          if [ -z "${SPACES_KEY_ID:-}" ] || [ -z "${SPACES_SECRET:-}" ]; then
+            echo "::warning::Spaces credentials not set — skipping upload."
+            exit 0
+          fi
+          export AWS_ACCESS_KEY_ID="$SPACES_KEY_ID"
+          export AWS_SECRET_ACCESS_KEY="$SPACES_SECRET"
+          WINDOW=$(node -e "process.stdout.write(require('./farm-replay.json').window)")
+          # Current channel object the site reads, plus a dated archive copy.
+          aws s3 cp farm-replay.json "s3://$BUCKET/$CHANNEL/farm-replay.json" \
+            --endpoint-url "$SPACES_ENDPOINT" --acl public-read \
+            --cache-control "max-age=300" --content-type application/json
+          aws s3 cp farm-replay.json "s3://$BUCKET/$CHANNEL/archive/$WINDOW.json" \
+            --endpoint-url "$SPACES_ENDPOINT" --acl public-read \
+            --cache-control "max-age=31536000" --content-type application/json
+          echo "Published $CHANNEL/farm-replay.json (window $WINDOW)"

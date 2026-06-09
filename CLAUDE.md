@@ -53,7 +53,26 @@ npm run preview  # serve dist/
   and the stats strip falls back to the all-playful set rather than mixing real labels with
   fake numbers ("Managers: 0" stays obviously tongue-in-cheek). `weekly-rebuild.yml` forces a
   DO rebuild Mondays 06:00 SGT to keep the numbers fresh; `site-quality.yml` runs link checks
-  (blocking) and Lighthouse (advisory) on PRs.
+  (blocking) and Lighthouse (advisory) on PRs. The link check excludes our own `rarebit.one`
+  domain from the network probe — a PR's new pages 404 on prod until they deploy, and the
+  POST-only `/mcp` returns 405 to a GET; root-relative links are still validated against `dist`.
+- **Client-work replay lane** — a nightly pipeline (`scripts/farm-feed/`, `farm-feed.yml`,
+  00:30 SGT) replays yesterday's private-repo activity on a fixed 24h delay as anonymized,
+  generic-language rows. It's a strict **gather → phrase → validate** sandwich: `gather.mjs`
+  reduces private workflow runs to category counts + timestamps **inside the script** (repo
+  names, branches, logins never leave it); `phrase.mjs` makes the **one** LLM call
+  (`claude-haiku-4-5`) producing only a digest line + generic per-category templates — it never
+  sees raw data or emits identifiers; `validate.mjs` is a hard gate that **exit-1s on any
+  blocklisted name, URL, email, @handle, or number absent from the sanitized totals**, then
+  assembles the artifact. Output publishes (`aws s3 cp`) to a DO Spaces bucket
+  (`rarebit-farm-feed`, channel from the `FARM_FEED_CHANNEL` repo var — `staging` until trusted,
+  then `live`). The site reads it at build (`farmReplay()` → SSR digest line in Operations, with
+  a freshness guard: only shown if the file's `window` is within the last two days SGT).
+  **Invariants, do not weaken:** the LLM phrases, it does not redact; the validator is the gate;
+  nothing is shown sooner than 24h. Secrets (user-created): `FEED_GITHUB_PAT`, `ANTHROPIC_API_KEY`,
+  `SPACES_KEY_ID`, `SPACES_SECRET` — each missing one no-ops its step so the workflow stays green
+  until wired up. **Dormant until the bucket has data**; the client-side 24h-delayed reveal UI
+  (animating individual rows) is a deliberate follow-up, built once there's real data to test against.
 - **Legal footer** (name, UEN, registered address) mirrors `rarebit-ops` `entity/profile.yml` —
   that file is the source of truth; update here when ACRA details change.
 - **Contact is MCP-first, form-fallback.** All CTAs route to `/connect`, which documents the
