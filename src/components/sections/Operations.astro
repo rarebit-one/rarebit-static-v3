@@ -2,7 +2,7 @@
 import Section from "../Section.astro";
 import Heading from "../Heading.astro";
 import Generating from "../Generating.astro";
-import { recentMerges, shortDate, farmReplay } from "../../lib/farm";
+import { recentMerges, shortDate, farmReplay, FARM_FEED_URL } from "../../lib/farm";
 
 // Receipts: real merges across the org's public repos, fetched at build
 // time. Omitted entirely when the API doesn't answer.
@@ -11,8 +11,8 @@ const merges = await recentMerges(3);
 // Client-work replay digest, fetched at build (SSR). Null until the nightly
 // pipeline publishes to the bucket. Freshness guard: only surface the digest
 // if the file's window is within the last two days (SGT) — a frozen weekly
-// build must not present a stale digest as current. The 24h-delayed client
-// reveal UI that animates individual rows is a follow-up.
+// build must not present a stale digest as current. The client script below
+// then replays yesterday's events on a fixed 24h delay and refreshes this line.
 const replay = await farmReplay();
 const freshDigest = (() => {
   if (!replay?.window) return null;
@@ -30,9 +30,9 @@ const freshDigest = (() => {
 
     {
       merges && (
-        <div class="mb-10">
+        <div class="mb-10" data-farm-feed data-replay-url={FARM_FEED_URL}>
           <div class="tagline mb-3 text-n-4">Receipts · recent merges across the org</div>
-          <ul class="font-code text-xs leading-6 text-n-3">
+          <ul class="font-code text-xs leading-6 text-n-3" data-feed-list>
             {merges.map((merge) => (
               <li class="flex items-baseline gap-3 py-2 border-t border-n-6 last:border-b min-w-0">
                 <a
@@ -48,11 +48,14 @@ const freshDigest = (() => {
               </li>
             ))}
           </ul>
-          {freshDigest && (
-            <p class="caption mt-3 text-n-4/70">
-              Client work · {freshDigest} <span class="text-n-4/50">(replayed on a 24h delay)</span>
-            </p>
-          )}
+          <p class="caption mt-3 text-n-4/70" data-feed-digest hidden={!freshDigest}>
+            {freshDigest && (
+              <>
+                Client work · {freshDigest}{" "}
+                <span class="text-n-4/50">(replayed on a 24h delay)</span>
+              </>
+            )}
+          </p>
         </div>
       )
     }
@@ -231,3 +234,128 @@ const freshDigest = (() => {
     </div>
   </div>
 </Section>
+
+<script>
+  // Client-work replay lane. Reads the nightly-published artifact and reveals
+  // each event into the receipts list on a fixed real-time + 24h delay — a
+  // delayed ticker. No-ops silently until the bucket has data (404 → return),
+  // so the SSR receipts + digest stand on their own. Replay-only: no live
+  // GitHub feed. The published text is already validator-gated; rows are still
+  // built with textContent (never innerHTML) as defence in depth.
+  const feed = document.querySelector<HTMLElement>("[data-farm-feed]");
+  const list = feed?.querySelector<HTMLUListElement>("[data-feed-list]");
+  const digestEl = feed?.querySelector<HTMLElement>("[data-feed-digest]");
+  const DELAY_MS = 24 * 60 * 60 * 1000;
+
+  type Scheduled = { id: string; text: string; displayAt: number; revealed: boolean };
+
+  // Yesterday's date in SGT (UTC+8) as YYYY-MM-DD — the window the pipeline
+  // labels its artifact with. Shift now into SGT wall-clock, step back a day.
+  const yesterdaySgt = () => {
+    const sgt = new Date(Date.now() + 8 * 3_600_000);
+    sgt.setUTCDate(sgt.getUTCDate() - 1);
+    return sgt.toISOString().slice(0, 10);
+  };
+
+  // The build-frozen digest may be days old (weekly rebuild), so the client
+  // owns this line at runtime: refresh from a fresh artifact, hide otherwise —
+  // never leave a stale line labelled "24h delay".
+  const setDigest = (text: string | null) => {
+    if (!digestEl) return;
+    if (!text) {
+      digestEl.hidden = true;
+      return;
+    }
+    digestEl.textContent = `Client work · ${text} `;
+    const note = document.createElement("span");
+    note.className = "text-n-4/50";
+    note.textContent = "(replayed on a 24h delay)";
+    digestEl.appendChild(note);
+    digestEl.hidden = false;
+  };
+
+  let schedule: Scheduled[] = [];
+  const seen = new Set<string>();
+  let timer = 0;
+
+  const revealRow = (item: Scheduled) => {
+    if (!list || seen.has(item.id)) return;
+    seen.add(item.id);
+    const li = document.createElement("li");
+    li.className =
+      "flex items-baseline gap-3 py-2 border-t border-n-6 last:border-b min-w-0";
+    const tag = document.createElement("span");
+    tag.className = "shrink-0 text-n-4/70";
+    tag.textContent = "Δ24h";
+    const txt = document.createElement("span");
+    txt.className = "truncate text-n-3";
+    txt.textContent = item.text;
+    const who = document.createElement("span");
+    who.className = "ml-auto shrink-0 text-n-4";
+    who.textContent = "client";
+    li.append(tag, txt, who);
+    list.prepend(li);
+  };
+
+  const tick = () => {
+    const now = Date.now();
+    let next = Infinity;
+    for (const s of schedule) {
+      if (s.revealed) continue;
+      const wait = s.displayAt - now;
+      if (wait <= 0) {
+        s.revealed = true;
+        revealRow(s);
+      } else {
+        next = Math.min(next, wait);
+      }
+    }
+    if (next !== Infinity) {
+      clearTimeout(timer);
+      // Cap the wait so a far-future event still re-checks at least hourly.
+      timer = window.setTimeout(tick, Math.min(next, 3_600_000) + 50);
+    }
+  };
+
+  const load = async () => {
+    const url = feed?.dataset.replayUrl;
+    if (!url) return;
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) return;
+      const data = await response.json();
+      // Stale or malformed → hide the build-frozen digest, reveal nothing.
+      if (!Array.isArray(data?.events) || data.window !== yesterdaySgt()) {
+        setDigest(null);
+        return;
+      }
+      setDigest(typeof data.digest === "string" ? data.digest : null);
+      schedule = data.events
+        .map((event: { at?: string; text?: string }, index: number) => {
+          const real = Date.parse(String(event.at));
+          return Number.isNaN(real)
+            ? null
+            : {
+                // Index-scoped so events sharing an `at` second don't collide.
+                id: `replay-${index}-${event.at}`,
+                text: String(event.text ?? "").slice(0, 80),
+                displayAt: real + DELAY_MS,
+                revealed: false,
+              };
+        })
+        .filter(Boolean) as Scheduled[];
+      tick();
+    } catch {
+      /* feed unreachable — SSR receipts + digest stand */
+    }
+  };
+
+  if (feed && list) {
+    load();
+    // Re-sync when the tab returns to the foreground (a long-open tab crosses
+    // new reveal windows; a new day's artifact may have published).
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) load();
+    });
+  }
+</script>

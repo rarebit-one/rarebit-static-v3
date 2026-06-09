@@ -67,12 +67,15 @@ npm run preview  # serve dist/
   assembles the artifact. Output publishes (`aws s3 cp`) to a DO Spaces bucket
   (`rarebit-farm-feed`, channel from the `FARM_FEED_CHANNEL` repo var — `staging` until trusted,
   then `live`). The site reads it at build (`farmReplay()` → SSR digest line in Operations, with
-  a freshness guard: only shown if the file's `window` is within the last two days SGT).
-  **Invariants, do not weaken:** the LLM phrases, it does not redact; the validator is the gate;
-  nothing is shown sooner than 24h. Secrets (user-created): `FEED_GITHUB_PAT`, `ANTHROPIC_API_KEY`,
-  `SPACES_KEY_ID`, `SPACES_SECRET` — each missing one no-ops its step so the workflow stays green
-  until wired up. **Dormant until the bucket has data**; the client-side 24h-delayed reveal UI
-  (animating individual rows) is a deliberate follow-up, built once there's real data to test against.
+  a freshness guard: only shown if the file's `window` is within the last two days SGT) and in the
+  browser: the Operations client script replays each event into the receipts list on a fixed
+  real-time + 24h delay (`Δ24h` rows), refreshing the digest and hiding it when the artifact is
+  stale (`window` ≠ yesterday-SGT) or absent. **Invariants, do not weaken:** the LLM phrases, it
+  does not redact; the validator is the gate; nothing is shown sooner than 24h. The gate is locked
+  by `scripts/farm-feed/validate.test.mjs` (run via `npm test` in CI) — keep it green. Secrets
+  (user-created): `FEED_GITHUB_PAT`, `ANTHROPIC_API_KEY`, `SPACES_KEY_ID`, `SPACES_SECRET` — each
+  missing one no-ops its step so the workflow stays green until wired up. **Dormant until the
+  bucket has data** (the client script no-ops on a 404; the SSR receipts + digest stand alone).
 - **Legal footer** (name, UEN, registered address) mirrors `rarebit-ops` `entity/profile.yml` —
   that file is the source of truth; update here when ACRA details change.
 - **Contact is MCP-first, form-fallback.** All CTAs route to `/connect`, which documents the
