@@ -1,0 +1,41 @@
+---
+import { getCollection, render } from "astro:content";
+import Layout from "../../layouts/Layout.astro";
+import Section from "../../components/Section.astro";
+import Tagline from "../../components/Tagline.astro";
+
+export async function getStaticPaths() {
+  const notes = await getCollection("notes");
+  return notes.map((note) => ({ params: { slug: note.id }, props: { note } }));
+}
+
+const { note } = Astro.props;
+const { Content } = await render(note);
+
+const formatDate = (date: Date) =>
+  new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", year: "numeric" }).format(date);
+---
+
+<Layout title={`${note.data.title} — Rarebit`} description={note.data.description}>
+  <Section crosses>
+    <div class="container">
+      <article class="max-w-[43.125rem] mx-auto">
+        <Tagline class="mb-4">{formatDate(note.data.pubDate)}</Tagline>
+        <h1 class="h2 mb-6">{note.data.title}</h1>
+        <p class="body-1 mb-10 text-n-3">{note.data.description}</p>
+
+        <div
+          class="body-2 text-n-3 [&_h2]:h6 [&_h2]:text-n-1 [&_h2]:mt-10 [&_h2]:mb-3 [&_p]:mb-4 [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mb-2 [&_a]:text-n-1 [&_a]:transition-colors hover:[&_a]:text-brand-magenta [&_strong]:text-n-1 [&_code]:font-code [&_code]:text-sm [&_code]:text-brand-cyan"
+        >
+          <Content />
+        </div>
+
+        <div class="mt-12 pt-6 border-t border-n-6">
+          <a class="button text-n-4 transition-colors hover:text-brand-magenta" href="/notes/">
+            ← All field notes
+          </a>
+        </div>
+      </article>
+    </div>
+  </Section>
+</Layout>

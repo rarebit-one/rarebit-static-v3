@@ -36,11 +36,17 @@ jobs:
       - name: Check links in built site
         uses: lycheeverse/lychee-action@v2
         with:
+          # Root-relative links (nav, content) are validated against the built
+          # dist via --root-dir. We exclude our own absolute URLs from the
+          # network check: a PR's new pages (canonical/og:url/llms.txt) 404 on
+          # prod until this very change deploys, and the POST-only /mcp returns
+          # 405 to a GET probe. External links are still checked.
           args: >-
             --no-progress
             --max-retries 2
             --accept 200..=299,403,429
             --exclude 'github\.com/rarebit-one/rarebit-ops'
+            --exclude 'rarebit\.one'
             --exclude 'localhost'
             --root-dir ${{ github.workspace }}/dist
             dist

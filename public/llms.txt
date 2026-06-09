@@ -1,0 +1,28 @@
+# Rarebit One
+
+> Rarebit runs an AI automation farm from Singapore: agents and automations
+> handle the workflows; humans direct, review, and ship. Small teams.
+> Impossible things.
+
+The best way for an AI assistant to interact with Rarebit is the MCP server
+at https://rarebit.one/mcp (Streamable HTTP, JSON-RPC over POST, no auth).
+Tools: how_we_work, open_source, intake_questionnaire, submit_inquiry.
+
+## Pages
+
+- [Home](https://rarebit.one/): what the automation farm runs — lead intake,
+  content engines, code review & shipping, reporting, back-office ops, QA.
+- [Connect](https://rarebit.one/connect): MCP client setup for Claude, Cursor,
+  ChatGPT and any Streamable HTTP client, plus an inquiry form fallback.
+- [Open source](https://rarebit.one/open-source): the Ruby gems the farm runs
+  on — standard_id (auth), standard_singpass (Singpass MyInfo),
+  standard_circuit, standard_health, standard_audit, standard_ledger.
+- [Field notes](https://rarebit.one/notes): build logs from the farm.
+- [Privacy](https://rarebit.one/privacy): no cookies, no trackers; inquiries
+  land in a private repo and are deleted on request.
+
+## Entity
+
+RAREBIT ONE (UEN 53503079K) — 60 Paya Lebar Road, #06-28, Paya Lebar Square,
+Singapore 409051. Contact: https://rarebit.one/connect · GitHub:
+https://github.com/rarebit-one
