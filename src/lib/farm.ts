@@ -31,6 +31,26 @@ async function fetchJson<T>(url: string, headers: Record<string, string> = {}): 
 
 const GITHUB_ACCEPT = { Accept: "application/vnd.github+json" };
 
+// The client-work replay feed (nightly pipeline → DO Spaces). The site reads
+// this at build for the SSR digest line; the client-side 24h-delayed reveal
+// UI is a follow-up. Channel is baked at build via PUBLIC_FARM_FEED_CHANNEL
+// (default "staging" until the pipeline is trusted; flip to "live" in prod).
+const FARM_FEED_CHANNEL = import.meta.env.PUBLIC_FARM_FEED_CHANNEL ?? "staging";
+export const FARM_FEED_URL = `https://rarebit-farm-feed.sgp1.digitaloceanspaces.com/${FARM_FEED_CHANNEL}/farm-replay.json`;
+
+export type FarmReplay = {
+  generated: string;
+  window: string;
+  digest: string;
+  events: Array<{ at: string; kind: string; text: string; ok: boolean }>;
+};
+
+/** The replay artifact, fetched at build time for the SSR digest line.
+    Returns null until the pipeline publishes to the bucket. */
+export function farmReplay(): Promise<FarmReplay | null> {
+  return memoized("farm-replay", () => fetchJson<FarmReplay>(FARM_FEED_URL));
+}
+
 /** Merged PRs across the org's public repos in the last `days` days. */
 export function mergedPrCount(days = 30): Promise<number | null> {
   return memoized(`prs:${days}`, async () => {

@@ -2,11 +2,23 @@
 import Section from "../Section.astro";
 import Heading from "../Heading.astro";
 import Generating from "../Generating.astro";
-import { recentMerges, shortDate } from "../../lib/farm";
+import { recentMerges, shortDate, farmReplay } from "../../lib/farm";
 
 // Receipts: real merges across the org's public repos, fetched at build
 // time. Omitted entirely when the API doesn't answer.
 const merges = await recentMerges(3);
+
+// Client-work replay digest, fetched at build (SSR). Null until the nightly
+// pipeline publishes to the bucket. Freshness guard: only surface the digest
+// if the file's window is within the last two days (SGT) — a frozen weekly
+// build must not present a stale digest as current. The 24h-delayed client
+// reveal UI that animates individual rows is a follow-up.
+const replay = await farmReplay();
+const freshDigest = (() => {
+  if (!replay?.window) return null;
+  const days = (Date.now() - Date.parse(`${replay.window}T00:00:00+08:00`)) / 86_400_000;
+  return days >= 0 && days <= 2 ? replay.digest : null;
+})();
 ---
 
 <Section id="operations">
@@ -36,6 +48,11 @@ const merges = await recentMerges(3);
               </li>
             ))}
           </ul>
+          {freshDigest && (
+            <p class="caption mt-3 text-n-4/70">
+              Client work · {freshDigest} <span class="text-n-4/50">(replayed on a 24h delay)</span>
+            </p>
+          )}
         </div>
       )
     }
