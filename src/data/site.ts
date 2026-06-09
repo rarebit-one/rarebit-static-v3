@@ -23,8 +23,8 @@ export const navigation = [
   { id: "0", title: "Automations", url: "/#automations" },
   { id: "1", title: "How we work", url: "/#how-we-work" },
   { id: "2", title: "Operations", url: "/#operations" },
-  { id: "3", title: "Roadmap", url: "/#roadmap" },
-  { id: "4", title: "Open source", url: "/open-source" },
+  { id: "3", title: "Open source", url: "/open-source" },
+  { id: "4", title: "Notes", url: "/notes" },
   { id: "5", title: "Connect", url: "/connect", onlyMobile: true },
 ];
 

@@ -4,9 +4,20 @@ import Section from "../components/Section.astro";
 import Heading from "../components/Heading.astro";
 import Tagline from "../components/Tagline.astro";
 import Button from "../components/Button.astro";
+import QRCode from "qrcode";
 import { site } from "../data/site";
 
 const endpoint = site.mcpEndpoint;
+
+// Desktop → phone handoff: connectors must be added on web/desktop, but the
+// form works anywhere — the QR opens this page on the phone. Build-time SVG,
+// no client JS. Dark-on-light (not inverted) — some scanner apps still
+// silently fail on negative QR codes.
+const qrSvg = await QRCode.toString(`https://${site.domain}/connect`, {
+  type: "svg",
+  margin: 1,
+  color: { dark: "#0e0c15", light: "#ffffff" },
+});
 
 const clients = [
   {
@@ -110,6 +121,35 @@ const tools = [
         </div>
       </div>
 
+      {/* Live demo — the endpoint answering from this very page */}
+      <div class="max-w-[50rem] mx-auto mb-15">
+        <div class="flex flex-col min-w-0 p-5 border border-n-1/10 rounded-3xl bg-n-7 md:p-8">
+          <Tagline class="mb-4">Try it from right here</Tagline>
+          <p class="body-2 mb-6 text-n-4">
+            These buttons send the live endpoint the same JSON-RPC your assistant would. No
+            signup, no key — it just answers.
+          </p>
+          <div class="flex flex-wrap gap-3">
+            {
+              ["how_we_work", "open_source", "intake_questionnaire"].map((tool) => (
+                <button
+                  class="button px-4 py-2 border border-n-1/15 rounded-lg font-code normal-case text-n-1 cursor-pointer transition-colors hover:text-brand-magenta hover:border-brand-magenta/40"
+                  data-demo-tool={tool}
+                >
+                  {tool}
+                </button>
+              ))
+            }
+          </div>
+          <pre
+            class="hidden mt-6 p-4 bg-n-8 rounded-xl font-code text-xs leading-5 text-n-2 whitespace-pre-wrap max-h-80 overflow-y-auto md:text-sm md:leading-6"
+            data-demo-output
+            data-endpoint={endpoint}
+            aria-live="polite"
+          ></pre>
+        </div>
+      </div>
+
       <div class="grid gap-5 lg:grid-cols-2 mb-15">
         {
           clients.map((client) => (
@@ -154,11 +194,22 @@ const tools = [
           /inquiry function, for anyone who can't add an MCP connector. */}
       <div class="max-w-[50rem] mx-auto mb-15" id="inquiry">
         <div class="flex flex-col min-w-0 p-5 border border-n-1/10 rounded-3xl bg-n-7 md:p-8">
-          <Tagline class="mb-4">No MCP? Same inbox</Tagline>
-          <p class="body-2 mb-6 text-n-4">
-            On mobile, or just prefer typing it yourself? This lands exactly where the MCP
-            inquiries do — we read every one and reply by email.
-          </p>
+          <div class="flex items-start justify-between gap-6 mb-6">
+            <div>
+              <Tagline class="mb-4">No MCP? Same inbox</Tagline>
+              <p class="body-2 text-n-4">
+                On mobile, or just prefer typing it yourself? This lands exactly where the MCP
+                inquiries do — we read every one and reply by email.
+              </p>
+            </div>
+            <div class="hidden shrink-0 text-center md:block" aria-hidden="true">
+              <div
+                class="w-24 h-24 p-1.5 bg-white rounded-lg [&>svg]:w-full [&>svg]:h-full"
+                set:html={qrSvg}
+              />
+              <div class="tagline mt-2 text-n-4/70">Open on phone</div>
+            </div>
+          </div>
 
           <form data-inquiry-form novalidate>
             <div class="grid gap-4 sm:grid-cols-2 mb-4">
@@ -320,6 +371,35 @@ const tools = [
       submit.disabled = false;
       if (label) label.textContent = idle;
     }
+  });
+
+  // Live MCP demo — same JSON-RPC envelope an assistant sends.
+  const demoOutput = document.querySelector<HTMLPreElement>("[data-demo-output]");
+  let demoId = 0;
+  document.querySelectorAll<HTMLButtonElement>("[data-demo-tool]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      if (!demoOutput) return;
+      demoOutput.classList.remove("hidden");
+      demoOutput.textContent = `→ tools/call ${button.dataset.demoTool}…`;
+      try {
+        const response = await fetch(demoOutput.dataset.endpoint ?? "", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: ++demoId,
+            method: "tools/call",
+            params: { name: button.dataset.demoTool, arguments: {} },
+          }),
+        });
+        const payload = await response.json();
+        demoOutput.textContent =
+          payload.result?.content?.[0]?.text ?? JSON.stringify(payload.error ?? payload, null, 2);
+      } catch {
+        demoOutput.textContent =
+          "Could not reach the endpoint from this network — try it from your assistant instead.";
+      }
+    });
   });
 
   document.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((button) => {
