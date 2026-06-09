@@ -10,7 +10,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, existsSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,8 +29,9 @@ function runValidate(phrased) {
   writeFileSync(phrasedPath, JSON.stringify(phrased));
   const res = spawnSync("node", [VALIDATE, SANITIZED, phrasedPath, outPath], { encoding: "utf8" });
   const wrote = existsSync(outPath);
+  const artifact = wrote ? JSON.parse(readFileSync(outPath, "utf8")) : null;
   rmSync(dir, { recursive: true, force: true });
-  return { code: res.status, stderr: res.stderr, wrote };
+  return { code: res.status, stderr: res.stderr, wrote, artifact };
 }
 
 // Only allowed numbers (23/4/96) and generic, identifier-free phrasing.
@@ -48,6 +49,26 @@ test("passes clean phrased input and writes the artifact", () => {
   const { code, wrote } = runValidate(CLEAN);
   assert.equal(code, 0);
   assert.ok(wrote, "expected an artifact to be written on pass");
+});
+
+test("assembles the artifact from validated templates (the safety contract)", () => {
+  const { artifact } = runValidate(CLEAN);
+  // One published event per sanitized event (fixture has 5), tagged window.
+  assert.equal(artifact.window, "2026-06-07");
+  assert.equal(artifact.events.length, 5);
+  // Every published text is template-derived (+ ×count / · failed suffixes) —
+  // never free-form model output, never an identifier.
+  const templates = Object.values(CLEAN.phrases).flat();
+  for (const event of artifact.events) {
+    assert.ok(
+      templates.some((t) => event.text.startsWith(t)),
+      `published text "${event.text}" is not derived from a phrase template`
+    );
+  }
+  // The failed data-pipeline event carries the outcome suffix; a counted one
+  // carries ×N — proves the assembler, not the model, owns the published shape.
+  assert.ok(artifact.events.some((e) => e.text.endsWith("· failed")));
+  assert.ok(artifact.events.some((e) => /×\d+$/.test(e.text)));
 });
 
 test("rejects a blocklisted identifier", () => {

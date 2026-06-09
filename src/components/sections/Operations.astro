@@ -325,6 +325,11 @@ const freshDigest = (() => {
       if (!response.ok) return;
       const data = await response.json();
       // Stale or malformed → hide the build-frozen digest, reveal nothing.
+      // NB: the client is intentionally STRICTER than the SSR freshDigest
+      // guard (which accepts a 2-day window so a weekly build still shows
+      // something). The client is authoritative at runtime: it only replays
+      // *yesterday's* artifact and suppresses any older digest the SSR
+      // optimistically rendered. Don't "harmonize" the two thresholds.
       if (!Array.isArray(data?.events) || data.window !== yesterdaySgt()) {
         setDigest(null);
         return;
