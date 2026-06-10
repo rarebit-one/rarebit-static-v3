@@ -1,0 +1,47 @@
+{
+  "window": { "from": "2026-06-01", "to": "2026-06-07" },
+  "public": {
+    "prs": [
+      {
+        "repo": "rarebit-static-v3",
+        "number": 21,
+        "title": "Field notes: weekly auto-publishing generator",
+        "url": "https://github.com/rarebit-one/rarebit-static-v3/pull/21"
+      },
+      {
+        "repo": "standard_ledger",
+        "number": 8,
+        "title": "Declarative aggregate projections",
+        "url": "https://github.com/rarebit-one/standard_ledger/pull/8"
+      }
+    ],
+    "releases": [
+      {
+        "repo": "standard_ledger",
+        "name": "v0.4.0",
+        "tag": "v0.4.0",
+        "url": "https://github.com/rarebit-one/standard_ledger/releases/tag/v0.4.0"
+      }
+    ],
+    "repos": ["rarebit-static-v3", "standard_ledger", "standard_id"]
+  },
+  "private": {
+    "totals": { "runs": 47, "systems": 5, "greenPct": 94 },
+    "categories": ["tests", "deploy", "data pipeline", "scheduled job"],
+    "events": [
+      { "category": "tests", "ok": true, "count": 22 },
+      { "category": "deploy", "ok": true, "count": 9 },
+      { "category": "data pipeline", "ok": true, "count": 11 },
+      { "category": "scheduled job", "ok": false, "count": 5 }
+    ],
+    "blocklist": ["acme-payments", "rarebit-one/acme-payments", "octocat", "ada-eng"]
+  },
+  "pastNotes": [
+    {
+      "title": "This site was built by the farm (humans merged)",
+      "slug": "this-site-was-built-by-the-farm",
+      "pubDate": "2026-06-08",
+      "description": "Six pull requests, agent-written code, human-approved merges."
+    }
+  ]
+}
