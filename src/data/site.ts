@@ -24,7 +24,7 @@ export const navigation = [
   { id: "1", title: "How we work", url: "/#how-we-work" },
   { id: "2", title: "Operations", url: "/#operations" },
   { id: "3", title: "Open source", url: "/open-source" },
-  { id: "4", title: "Notes", url: "/notes" },
+  { id: "4", title: "Field Notes", url: "/field-notes" },
   { id: "5", title: "Connect", url: "/connect", onlyMobile: true },
 ];
 

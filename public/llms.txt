@@ -17,7 +17,7 @@ Tools: how_we_work, open_source, intake_questionnaire, submit_inquiry.
 - [Open source](https://rarebit.one/open-source): the Ruby gems the farm runs
   on — standard_id (auth), standard_singpass (Singpass MyInfo),
   standard_circuit, standard_health, standard_audit, standard_ledger.
-- [Field notes](https://rarebit.one/notes): build logs from the farm.
+- [Field notes](https://rarebit.one/field-notes): build logs from the farm.
 - [Privacy](https://rarebit.one/privacy): no cookies, no trackers; inquiries
   land in a private repo and are deleted on request.
 
