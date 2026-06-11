@@ -17,9 +17,11 @@
 
 import { execFileSync } from "node:child_process";
 
-const { GH_TOKEN, AUTOLAND_PAT, AUTOLAND_LIVE, OWNER, REPO } = process.env;
+const { GH_TOKEN, AUTOLAND_PAT, AUTOLAND_LIVE } = process.env;
 const LIVE = AUTOLAND_LIVE === "true";
-const REPO_SLUG = `${OWNER}/${REPO}`;
+// GITHUB_REPOSITORY ("owner/repo") is always set by Actions on every event type,
+// including `schedule` where github.event.repository is absent. Prefer it.
+const REPO_SLUG = process.env.GITHUB_REPOSITORY || `${process.env.OWNER}/${process.env.REPO}`;
 
 const REQUIRED_CONTEXTS = ["Type-check & build", "Link check", "claude-review/clear"];
 const TRUSTED_ASSOC = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
