@@ -4,6 +4,7 @@ import Section from "../components/Section.astro";
 import Heading from "../components/Heading.astro";
 import Tagline from "../components/Tagline.astro";
 import Button from "../components/Button.astro";
+import Sphere from "../components/Sphere.astro";
 import Collaboration from "../components/sections/Collaboration.astro";
 import { howWeWork } from "../data/howWeWork";
 import { site } from "../data/site";
@@ -39,6 +40,8 @@ const stamp = buildStamp();
 <Layout title={howWeWork.meta.title} description={howWeWork.meta.description}>
   <Section crosses>
     <div class="container">
+      {/* Hero — the demo's pricing-page sphere, reworked as our farm globe. */}
+      <Sphere class="w-[17rem] mx-auto -mb-6 md:w-[22rem] md:-mb-10 lg:w-[26rem]" />
       <Heading
         level={1}
         tag={howWeWork.hero.tag}
@@ -46,29 +49,50 @@ const stamp = buildStamp();
         text={howWeWork.hero.text}
       />
 
-      {/* The arc — one mechanism per step, all real. */}
-      <div class="max-w-[55rem] mx-auto">
+      {/* The arc — one mechanism per step, all real. A bento grid (the
+          template's Services layout), deliberately not the vertical list we
+          keep for Field Notes: paired tiles around a wide centre step. */}
+      <div class="grid gap-5 lg:grid-cols-6">
         {
-          howWeWork.steps.map((step) => (
-            <div class="reveal relative mb-5 p-6 border border-n-1/10 rounded-3xl bg-n-7 overflow-hidden transition-colors hover:border-brand-cyan/30 md:p-8 xl:p-10">
-              <div class="absolute top-0 left-0 max-w-full opacity-40 pointer-events-none">
-                <img class="w-full" src="/images/grid.png" width="550" height="550" alt="" />
-              </div>
-              <div class="relative z-1">
-                <Tagline class="mb-4">{step.tag}</Tagline>
-                <h3 class="h4 mb-4">{step.title}</h3>
-                <p class="body-2 text-n-3">{step.body}</p>
-                {step.id === "contact" && (
-                  <a
-                    class="button inline-flex items-center mt-5 text-brand-cyan transition-colors hover:text-brand-magenta"
-                    href="/connect"
-                  >
-                    <code class="font-code text-xs">{site.mcpEndpoint}</code>
-                  </a>
+          howWeWork.steps.map((step) => {
+            const featured = step.id === "pipeline";
+            return (
+              <div
+                class={`reveal relative flex p-6 border border-n-1/10 rounded-3xl bg-n-7 overflow-hidden transition-colors hover:border-brand-cyan/30 md:p-8 xl:p-10 lg:col-span-3 ${featured ? "lg:col-span-6" : ""}`}
+              >
+                <div class="absolute top-0 left-0 max-w-full opacity-40 pointer-events-none">
+                  <img class="w-full" src="/images/grid.png" width="550" height="550" alt="" />
+                </div>
+                {featured && (
+                  <div class="absolute inset-y-0 right-0 hidden w-3/5 pointer-events-none lg:block">
+                    <img
+                      class="w-full h-full object-cover object-left"
+                      src="/images/rarebit/dashboard-factory.webp"
+                      width="1536"
+                      height="1024"
+                      loading="lazy"
+                      decoding="async"
+                      alt=""
+                    />
+                    <div class="absolute inset-0 bg-gradient-to-r from-n-7 from-25% via-n-7/70 to-n-7/10" />
+                  </div>
                 )}
+                <div class={`relative z-1 ${featured ? "max-w-[34rem]" : ""}`}>
+                  <Tagline class="mb-4">{step.tag}</Tagline>
+                  <h3 class={`${featured ? "h3" : "h4"} mb-4`}>{step.title}</h3>
+                  <p class="body-2 text-n-3">{step.body}</p>
+                  {step.id === "contact" && (
+                    <a
+                      class="button inline-flex items-center mt-5 text-brand-cyan transition-colors hover:text-brand-magenta"
+                      href="/connect"
+                    >
+                      <code class="font-code text-xs">{site.mcpEndpoint}</code>
+                    </a>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         }
       </div>
     </div>

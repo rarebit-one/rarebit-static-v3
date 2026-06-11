@@ -4,9 +4,33 @@ import Section from "../components/Section.astro";
 import Heading from "../components/Heading.astro";
 import Tagline from "../components/Tagline.astro";
 import Button from "../components/Button.astro";
+import HeroBanner from "../components/HeroBanner.astro";
 import { openSourceCatalog } from "../data/openSource";
 import { site } from "../data/site";
 import { gemInfo, compactNumber } from "../lib/farm";
+
+// Presentational only (kept out of the catalog data so the MCP sync stays
+// clean): a brand shot + one-line frame for each category's alternating row.
+const categoryMeta: Record<string, { image: string; alt: string; blurb: string }> = {
+  auth: {
+    image: "/images/rarebit/operator.webp",
+    alt: "An operator at the controls",
+    blurb:
+      "The login box is the easy part. These carry the parts that aren't — OAuth 2.0 / OIDC, passwordless OTP, and national digital identity — secure by default, built on Rails' own primitives.",
+  },
+  reliability: {
+    image: "/images/rarebit/dashboard-factory.webp",
+    alt: "The farm's live operations dashboard",
+    blurb:
+      "What keeps the farm honest: circuit breakers, drop-in health checks, and database-backed audit trails that turn 'is it up?' into something you can actually answer.",
+  },
+  data: {
+    image: "/images/rarebit/torii.webp",
+    alt: "A gateway at dusk",
+    blurb:
+      "Data patterns that stay trustworthy long after the write — immutable journal entries with declarative aggregate projections, no bespoke reconciliation.",
+  },
+};
 
 // Live version + download counts from RubyGems at build time; the static
 // version string is the fallback when the API doesn't answer.
@@ -62,9 +86,29 @@ const softwareLd = {
       />
 
       {
-        catalog.map((category) => (
-          <div class="mb-15 last:mb-0">
-            <h3 class="h4 mb-8">{category.title}</h3>
+        catalog.map((category, i) => (
+          <div class="mb-20 last:mb-0">
+            {/* Alternating image row — the FeaturesPage layout, per category. */}
+            <div
+              class={`reveal mb-10 flex flex-col items-center gap-8 lg:mb-14 lg:gap-14 ${
+                i % 2 === 1 ? "lg:flex-row-reverse" : "lg:flex-row"
+              }`}
+            >
+              <div class="w-full lg:w-1/2">
+                <HeroBanner
+                  src={categoryMeta[category.id].image}
+                  alt={categoryMeta[category.id].alt}
+                  aspect="aspect-[16/10]"
+                  width={600}
+                  height={400}
+                />
+              </div>
+              <div class="w-full lg:w-1/2">
+                <Tagline class="mb-4">{category.mcpLabel}</Tagline>
+                <h2 class="h3 mb-4">{category.title}</h2>
+                <p class="body-2 text-n-3">{categoryMeta[category.id].blurb}</p>
+              </div>
+            </div>
             <div class="grid gap-5 lg:grid-cols-2">
               {category.repos.map((repo) => (
                 <div class="reveal relative flex flex-col p-6 border border-n-1/10 rounded-3xl bg-n-7 overflow-hidden transition-colors hover:border-brand-cyan/30 md:p-8 xl:p-10">

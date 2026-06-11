@@ -1,0 +1,50 @@
+---
+// Wireframe-globe hero graphic, recreated from the Brainwave demo's pricing
+// hero (UI8 kit). Pure SVG + CSS — meridian/latitude ellipses with a brand
+// spectrum stroke, a soft glow, and a few planet dots reusing the site's
+// `orb-float` motion (gated by prefers-reduced-motion in global.css).
+interface Props {
+  class?: string;
+}
+const { class: className = "" } = Astro.props;
+---
+
+<div class={`relative aspect-square pointer-events-none ${className}`} aria-hidden="true">
+  <svg class="w-full h-full" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="sphere-stroke" x1="40" y1="40" x2="360" y2="360" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#FF0F8A"></stop>
+        <stop offset="0.3" stop-color="#B14CFF"></stop>
+        <stop offset="0.55" stop-color="#5B8DEF"></stop>
+        <stop offset="0.8" stop-color="#00E8FF"></stop>
+        <stop offset="1" stop-color="#88E5BE"></stop>
+      </linearGradient>
+      <radialGradient id="sphere-glow" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stop-color="#B14CFF" stop-opacity="0.28"></stop>
+        <stop offset="0.7" stop-color="#5B8DEF" stop-opacity="0.08"></stop>
+        <stop offset="1" stop-color="#5B8DEF" stop-opacity="0"></stop>
+      </radialGradient>
+    </defs>
+
+    <circle cx="200" cy="200" r="186" fill="url(#sphere-glow)"></circle>
+
+    <g stroke="url(#sphere-stroke)" stroke-width="1.25" stroke-linecap="round">
+      {/* outer rim + longitude meridians (poles top & bottom) */}
+      <circle cx="200" cy="200" r="150"></circle>
+      <ellipse cx="200" cy="200" rx="116" ry="150"></ellipse>
+      <ellipse cx="200" cy="200" rx="74" ry="150"></ellipse>
+      <ellipse cx="200" cy="200" rx="30" ry="150"></ellipse>
+      <line x1="200" y1="50" x2="200" y2="350"></line>
+      {/* a couple of faint latitudes for the globe grid */}
+      <ellipse cx="200" cy="200" rx="150" ry="86" opacity="0.45"></ellipse>
+      <ellipse cx="200" cy="200" rx="150" ry="34" opacity="0.3"></ellipse>
+      <line x1="50" y1="200" x2="350" y2="200" opacity="0.3"></line>
+    </g>
+  </svg>
+
+  {/* Planet dots — same colors & float as the home hero's orbiting system. */}
+  <span class="absolute top-[14%] right-[8%] w-3 h-3 bg-gradient-to-b from-[#DD734F] to-[#1A1A32] rounded-full orb-float"></span>
+  <span class="absolute top-[34%] -left-[2%] w-2 h-2 bg-gradient-to-b from-[#B9AEDF] to-[#1A1A32] rounded-full orb-float-delayed"></span>
+  <span class="absolute bottom-[16%] right-[2%] w-4 h-4 bg-gradient-to-b from-[#88E5BE] to-[#1A1A32] rounded-full orb-float-delayed"></span>
+  <span class="absolute bottom-[10%] left-[16%] w-2.5 h-2.5 bg-gradient-to-b from-[#DD734F] to-[#1A1A32] rounded-full orb-float"></span>
+</div>
