@@ -94,7 +94,11 @@ const feedDormant = !freshReplay;
                     <span data-metric={metric.key}>
                       {typeof metric.value === "number" ? metric.value : "—"}
                     </span>
-                    {metric.suffix && typeof metric.value === "number" && metric.suffix}
+                    {metric.suffix && (
+                      <span data-suffix={metric.key} hidden={typeof metric.value !== "number"}>
+                        {metric.suffix}
+                      </span>
+                    )}
                   </div>
                   <p class="body-2 mt-2 text-n-4">{metric.label}</p>
                 </div>
@@ -313,7 +317,13 @@ const feedDormant = !freshReplay;
     for (const key of ["runs", "systems", "greenPct"]) {
       const el = totalsBox.querySelector<HTMLElement>(`[data-metric="${key}"]`);
       const value = totals[key];
-      if (el && typeof value === "number") el.textContent = String(value);
+      if (el && typeof value === "number") {
+        el.textContent = String(value);
+        // Reveal the unit suffix (e.g. "%") hidden while dormant, so a cold-start
+        // build that activates client-side shows "96%", not a bare "96".
+        const suffix = totalsBox.querySelector<HTMLElement>(`[data-suffix="${key}"]`);
+        if (suffix) suffix.hidden = false;
+      }
     }
   };
 
