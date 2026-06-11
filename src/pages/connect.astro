@@ -4,7 +4,6 @@ import Section from "../components/Section.astro";
 import Heading from "../components/Heading.astro";
 import Tagline from "../components/Tagline.astro";
 import Button from "../components/Button.astro";
-import HeroBanner from "../components/HeroBanner.astro";
 import Faq from "../components/Faq.astro";
 import { site } from "../data/site";
 
@@ -111,15 +110,6 @@ const tools = [
 >
   <Section crosses>
     <div class="container">
-      {/* Front-door banner — the torii gate as the way in. */}
-      <HeroBanner
-        src="/images/rarebit/torii.webp"
-        alt="Rarebit — the gateway in"
-        class="max-w-[60rem] mx-auto mb-12 md:mb-16"
-        aspect="aspect-[16/6]"
-        width={600}
-        height={400}
-      />
       <Heading
         level={1}
         tag="Model Context Protocol"
