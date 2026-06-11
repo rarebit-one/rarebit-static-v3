@@ -1,0 +1,36 @@
+{
+  "window": { "from": "2026-06-10", "to": "2026-06-11" },
+  "public": [
+    {
+      "repo": "rarebit-static-v3",
+      "kind": "pr",
+      "title": "Notebook + interesting-work scout",
+      "url": "https://github.com/rarebit-one/rarebit-static-v3/pull/40",
+      "mergedAt": "2026-06-10T08:14:00Z"
+    },
+    {
+      "repo": "standard_ledger",
+      "kind": "release",
+      "title": "v0.5.0",
+      "url": "https://github.com/rarebit-one/standard_ledger/releases/tag/v0.5.0",
+      "date": "2026-06-10T02:00:00Z"
+    },
+    {
+      "repo": "standard_id",
+      "kind": "commit",
+      "title": "Rework passwordless session expiry",
+      "url": "https://github.com/rarebit-one/standard_id/commit/abc1234",
+      "date": "2026-06-11T01:30:00Z"
+    }
+  ],
+  "private": {
+    "categories": ["tests", "data pipeline", "scheduled job"],
+    "events": [
+      { "category": "tests", "ok": true, "count": 8 },
+      { "category": "data pipeline", "ok": true, "count": 5 },
+      { "category": "scheduled job", "ok": true, "count": 3 }
+    ],
+    "totals": { "runs": 16, "systems": 4, "greenPct": 100 }
+  },
+  "blocklist": ["acme-payments", "rarebit-one/acme-payments", "octocat", "ada-eng"]
+}

@@ -39,6 +39,12 @@ jobs:
       FEED_GITHUB_PAT: ${{ secrets.FEED_GITHUB_PAT }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Read-only access to the private idea-seed notebook in DO Spaces so
+      # gather can mine it for candidate angles (best-effort; absent → no seeds).
+      # CHANNEL must match the notebook workflow so we read the same object.
+      SPACES_KEY_ID: ${{ secrets.SPACES_KEY_ID }}
+      SPACES_SECRET: ${{ secrets.SPACES_SECRET }}
+      CHANNEL: ${{ vars.FARM_FEED_CHANNEL || 'staging' }}
     steps:
       - uses: actions/checkout@v4
 

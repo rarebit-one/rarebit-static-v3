@@ -47,9 +47,11 @@ PUBLIC work may be named and linked, using ONLY the repo names, PR titles, and U
 
 PRIVATE/client work is provided ONLY as anonymized category counts. Refer to it generically — e.g. "across private systems, N runs ran mostly green" — and NEVER name or describe a client, product, person, or private repository, even in passing.
 
-When it is genuinely relevant, you may link to a past field note using its /field-notes/<slug>/ path from the provided pastNotes.`;
+When it is genuinely relevant, you may link to a past field note using its /field-notes/<slug>/ path from the provided pastNotes.
 
-const prompt = `Here are this week's facts (window, public PRs/releases/repos, anonymized private aggregate, and past notes):
+If a "notebook" array is present, it holds OPTIONAL idea-seeds collected by a daily scout — candidate angles you MAY draw on if one fits this week, and should ignore otherwise. They are grounded in public facts, but they are prompts, not facts: you must still ground every published claim and link in the facts above (PRs/releases/repos), and the same anonymization rules apply to anything they hint at.`;
+
+const prompt = `Here are this week's facts (window, public PRs/releases/repos, anonymized private aggregate, past notes, and optional notebook idea-seeds):
 
 ${JSON.stringify(forModel, null, 2)}
 
