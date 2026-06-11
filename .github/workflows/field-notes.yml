@@ -26,6 +26,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: field-notes
@@ -39,12 +40,6 @@ jobs:
       FEED_GITHUB_PAT: ${{ secrets.FEED_GITHUB_PAT }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # Read-only access to the private idea-seed notebook in DO Spaces so
-      # gather can mine it for candidate angles (best-effort; absent → no seeds).
-      # CHANNEL must match the notebook workflow so we read the same object.
-      SPACES_KEY_ID: ${{ secrets.SPACES_KEY_ID }}
-      SPACES_SECRET: ${{ secrets.SPACES_SECRET }}
-      CHANNEL: ${{ vars.FARM_FEED_CHANNEL || 'staging' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -77,3 +72,29 @@ jobs:
           git add src/content/field-notes
           git commit -m "Field notes: weekly entry"
           git push
+
+      - name: Close the seed issues this note used
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Best-effort: only when a note was actually published (the note file
+          # is committed) and the draft reported the seeds it drew on. A missing
+          # draft.json, no usedSeedIssues, or a thin-week no-op simply skips.
+          if [ ! -f draft.json ]; then
+            echo "No draft.json — nothing to close."
+            exit 0
+          fi
+          if [ -z "$(git log -1 --name-only --pretty=format: | grep '^src/content/field-notes/' || true)" ]; then
+            echo "No new note committed this run — leaving seed issues open."
+            exit 0
+          fi
+          issues=$(node -e 'const d=require("./draft.json");const a=Array.isArray(d.usedSeedIssues)?d.usedSeedIssues:[];process.stdout.write(a.filter(n=>Number.isInteger(n)&&n>0).join(" "))')
+          if [ -z "$issues" ]; then
+            echo "draft reported no used seed issues — nothing to close."
+            exit 0
+          fi
+          for n in $issues; do
+            gh issue close "$n" --comment "Used in this week's field note." || \
+              echo "::warning::could not close seed issue #$n (already closed or missing)"
+          done

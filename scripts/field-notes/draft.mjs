@@ -49,7 +49,7 @@ PRIVATE/client work is provided ONLY as anonymized category counts. Refer to it 
 
 When it is genuinely relevant, you may link to a past field note using its /field-notes/<slug>/ path from the provided pastNotes.
 
-If a "notebook" array is present, it holds OPTIONAL idea-seeds collected by a daily scout — candidate angles you MAY draw on if one fits this week, and should ignore otherwise. They are grounded in public facts, but they are prompts, not facts: you must still ground every published claim and link in the facts above (PRs/releases/repos), and the same anonymization rules apply to anything they hint at.`;
+If a "notebook" array is present, it holds OPTIONAL idea-seeds collected by a daily scout — candidate angles you MAY draw on if one fits this week, and should ignore otherwise. Each seed carries an "issue" number. They are grounded in public facts, but they are prompts, not facts: you must still ground every published claim and link in the facts above (PRs/releases/repos), and the same anonymization rules apply to anything they hint at. If you genuinely drew on one or more seeds, list their issue numbers in "usedSeedIssues"; otherwise omit it or use an empty array.`;
 
 const prompt = `Here are this week's facts (window, public PRs/releases/repos, anonymized private aggregate, past notes, and optional notebook idea-seeds):
 
@@ -61,10 +61,11 @@ Write the week's field note. Return STRICT JSON only — no prose, no markdown c
   "title": "<= 70 characters, no trailing period",
   "description": "one sentence, <= 160 characters",
   "slug": "kebab-case-derived-from-the-title",
-  "body": "markdown with ## section headings. Link public PRs and repos using ONLY the URLs provided in the facts. Optionally link one relevant past note via its /field-notes/<slug>/ path. Refer to private work only as anonymized totals."
+  "body": "markdown with ## section headings. Link public PRs and repos using ONLY the URLs provided in the facts. Optionally link one relevant past note via its /field-notes/<slug>/ path. Refer to private work only as anonymized totals.",
+  "usedSeedIssues": []
 }
 
-Do not include a pubDate — it is set downstream.`;
+"usedSeedIssues" is OPTIONAL — an array of the notebook seed issue numbers you actually drew on (empty or omitted if none). Do not include a pubDate — it is set downstream.`;
 
 const response = await fetch("https://api.anthropic.com/v1/messages", {
   method: "POST",
@@ -108,5 +109,16 @@ for (const field of required) {
   }
 }
 
+// Normalize the OPTIONAL usedSeedIssues to a clean array of positive integers
+// (issue numbers the draft drew on). The workflow closes these after publish;
+// anything non-numeric is dropped so a malformed value can't break that step.
+const usedSeedIssues = (Array.isArray(draft.usedSeedIssues) ? draft.usedSeedIssues : [])
+  .map((n) => Number(n))
+  .filter((n) => Number.isInteger(n) && n > 0);
+draft.usedSeedIssues = usedSeedIssues;
+
 writeFileSync(OUT, JSON.stringify(draft, null, 2));
-console.log(`draft: "${draft.title}" (slug: ${draft.slug}) → ${OUT}`);
+console.log(
+  `draft: "${draft.title}" (slug: ${draft.slug})` +
+    `${usedSeedIssues.length ? `, used seeds #${usedSeedIssues.join(", #")}` : ""} → ${OUT}`
+);

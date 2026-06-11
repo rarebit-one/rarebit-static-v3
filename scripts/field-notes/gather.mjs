@@ -14,35 +14,29 @@
 //     field other than `blocklist` — the drafter never sees them, and the
 //     validator (step 3) hard-fails if any leak into the note.
 //
-// Also reads existing field notes for back-linking (`pastNotes`), and — when
-// Spaces credentials are present — pulls the rolling idea-seed notebook (a
-// PRIVATE object the daily notebook scout maintains) so the drafter can mine
-// its `angle`/`grounding` pairs as OPTIONAL candidate angles. Only the seeds'
-// angles + grounding URLs are carried into facts — never any raw scout
-// internals — and the validator (step 3) remains the sole gate regardless.
+// Also reads existing field notes for back-linking (`pastNotes`), and pulls
+// the open idea-seed issues the daily notebook scout files (PUBLIC GitHub
+// issues labeled `field-note-seed` in this repo, replacing the old private
+// Spaces notebook) so the drafter can mine their `angle`/`grounding` pairs as
+// OPTIONAL candidate angles. Only the seed issue number + angle + grounding
+// URLs are carried into facts — and the validator (step 3) remains the sole
+// gate regardless.
 //
 // Token: prefers FEED_GITHUB_PAT, falls back to GITHUB_TOKEN. Missing both →
 // exit 0 with a notice so the workflow no-ops gracefully until secrets are
-// wired up. Notebook fetch is best-effort: missing creds or a missing object
-// just omits the `notebook` key — it never fails the gather.
+// wired up. The seed-issue fetch is best-effort: a failed listing or no open
+// seeds just omits the `notebook` key — it never fails the gather.
 //
 // Output: writes facts.json to the path in argv[2] (default ./facts.json).
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { createHash, createHmac } from "node:crypto";
 
 const ORG = "rarebit-one";
 const TOKEN = process.env.FEED_GITHUB_PAT || process.env.GITHUB_TOKEN;
 const OUT = process.argv[2] ?? "facts.json";
 const TZ_OFFSET = "+08:00"; // SGT — the farm runs on Singapore time
-
-// Notebook (idea-seed) source — the same DO Spaces bucket + channel as
-// farm-feed, but a PRIVATE object, so it's fetched with SigV4-signed creds.
-const SPACES_KEY_ID = process.env.SPACES_KEY_ID;
-const SPACES_SECRET = process.env.SPACES_SECRET;
-const SPACES_BUCKET = process.env.BUCKET || "rarebit-farm-feed";
-const SPACES_REGION = process.env.SPACES_REGION || "sgp1";
-const CHANNEL = process.env.FARM_FEED_CHANNEL || process.env.CHANNEL || "staging";
+const SEED_LABEL = "field-note-seed";
+const SEED_REPO = process.env.GITHUB_REPOSITORY || "rarebit-one/rarebit-static-v3";
 
 if (!TOKEN) {
   console.log("gather: no FEED_GITHUB_PAT / GITHUB_TOKEN set — skipping (graceful no-op).");
@@ -81,82 +75,55 @@ async function gh(path) {
   return response.json();
 }
 
-// --- Notebook fetch (SigV4-signed GET of a PRIVATE Spaces object) ----------
-// Self-contained AWS SigV4 (S3, payload-less GET) so we can read the private
-// notebook with no SDK dependency. Best-effort: any failure (no creds, 404,
-// network, malformed JSON) returns null and the gather proceeds without seeds.
-const sha256Hex = (s) => createHash("sha256").update(s).digest("hex");
-const hmac = (key, s) => createHmac("sha256", key).update(s).digest();
-
+// --- Notebook seeds (open `field-note-seed` GitHub issues) -----------------
+// The daily notebook scout files each idea-seed as a PUBLIC issue labeled
+// `field-note-seed`, with a hidden round-trip marker `<!-- seed:{json} -->` in
+// the body. We list the OPEN ones (open = pending candidate) and recover the
+// structured seed from the marker, falling back to the title as the angle plus
+// any URLs scraped from the body. Best-effort: a failed listing or no open
+// seeds returns null and the gather proceeds without seeds. Carries the issue
+// number so the draft step can report which seeds it used (to close them).
 async function fetchNotebookSeeds() {
-  if (!SPACES_KEY_ID || !SPACES_SECRET) {
-    console.log("gather: SPACES creds not set — skipping notebook fetch (no seeds).");
-    return null;
-  }
-  const host = `${SPACES_BUCKET}.${SPACES_REGION}.digitaloceanspaces.com`;
-  const key = `/${CHANNEL}/notebook.json`;
-  const service = "s3";
-  const now = new Date();
-  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, ""); // YYYYMMDDTHHMMSSZ
-  const dateStamp = amzDate.slice(0, 8);
-  const payloadHash = sha256Hex(""); // empty body
-  const canonicalHeaders =
-    `host:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
-  const signedHeaders = "host;x-amz-content-sha256;x-amz-date";
-  const canonicalRequest = [
-    "GET",
-    key,
-    "", // no query
-    canonicalHeaders,
-    signedHeaders,
-    payloadHash,
-  ].join("\n");
-  const scope = `${dateStamp}/${SPACES_REGION}/${service}/aws4_request`;
-  const stringToSign = [
-    "AWS4-HMAC-SHA256",
-    amzDate,
-    scope,
-    sha256Hex(canonicalRequest),
-  ].join("\n");
-  let signingKey = hmac(`AWS4${SPACES_SECRET}`, dateStamp);
-  signingKey = hmac(signingKey, SPACES_REGION);
-  signingKey = hmac(signingKey, service);
-  signingKey = hmac(signingKey, "aws4_request");
-  const signature = createHmac("sha256", signingKey).update(stringToSign).digest("hex");
-  const authorization =
-    `AWS4-HMAC-SHA256 Credential=${SPACES_KEY_ID}/${scope}, ` +
-    `SignedHeaders=${signedHeaders}, Signature=${signature}`;
-
+  let issues;
   try {
-    const res = await fetch(`https://${host}${key}`, {
-      headers: {
-        Host: host,
-        "x-amz-date": amzDate,
-        "x-amz-content-sha256": payloadHash,
-        Authorization: authorization,
-      },
-    });
-    if (res.status === 404) {
-      console.log("gather: notebook object not found (404) — proceeding without seeds.");
-      return null;
-    }
-    if (!res.ok) {
-      console.log(`gather: notebook fetch ${res.status} — proceeding without seeds.`);
-      return null;
-    }
-    const data = JSON.parse(await res.text());
-    const seeds = Array.isArray(data?.seeds) ? data.seeds : [];
-    // Carry ONLY angle + grounding — never raw scout internals (at/window/etc).
-    return seeds
-      .filter((s) => s && typeof s.angle === "string" && s.angle.trim() !== "")
-      .map((s) => ({
-        angle: s.angle.trim(),
-        grounding: (Array.isArray(s.grounding) ? s.grounding : []).filter((u) => typeof u === "string"),
-      }));
+    issues = await gh(
+      `/repos/${SEED_REPO}/issues?labels=${encodeURIComponent(SEED_LABEL)}&state=open&per_page=100`
+    );
   } catch (error) {
-    console.log(`gather: notebook fetch failed (${error.message}) — proceeding without seeds.`);
+    console.log(`gather: seed-issue listing failed (${error.message}) — proceeding without seeds.`);
     return null;
   }
+  if (!Array.isArray(issues)) return null;
+
+  const seeds = [];
+  for (const issue of issues) {
+    // The issues endpoint also returns PRs; skip those.
+    if (issue?.pull_request) continue;
+    const body = String(issue?.body ?? "");
+    const marker = body.match(/<!--\s*seed:(\{[\s\S]*?\})\s*-->/);
+    let angle = "";
+    let grounding = [];
+    if (marker) {
+      try {
+        const seed = JSON.parse(marker[1]);
+        if (typeof seed?.angle === "string") angle = seed.angle.trim();
+        grounding = (Array.isArray(seed?.grounding) ? seed.grounding : []).filter(
+          (u) => typeof u === "string"
+        );
+      } catch {
+        // fall through to title/body scrape
+      }
+    }
+    if (!angle) angle = String(issue?.title ?? "").trim();
+    if (!grounding.length) {
+      grounding = (body.match(/https?:\/\/[^\s)\]<>"']+/gi) ?? []).map((u) =>
+        u.replace(/[.,;:]+$/, "")
+      );
+    }
+    if (!angle) continue;
+    seeds.push({ issue: issue.number, angle, grounding });
+  }
+  return seeds;
 }
 
 // Workflow-name → category. Copied verbatim from farm-feed/gather.mjs so the
@@ -292,9 +259,10 @@ async function main() {
   const greenRuns = events.filter((e) => e.ok).reduce((sum, e) => sum + e.count, 0);
   const greenPct = runs ? Math.round((greenRuns / runs) * 100) : 100;
 
-  // OPTIONAL idea-seeds from the rolling notebook (best-effort; null if creds
-  // or object absent). Only angle + grounding are carried — these are candidate
-  // angles for the drafter, NOT facts to assert; the validator still gates URLs.
+  // OPTIONAL idea-seeds from the open `field-note-seed` issues (best-effort;
+  // null if the listing fails). { issue, angle, grounding } — candidate angles
+  // for the drafter, NOT facts to assert; the validator still gates URLs. The
+  // issue number lets the workflow close seeds the draft actually used.
   const notebookSeeds = await fetchNotebookSeeds();
 
   const facts = {
