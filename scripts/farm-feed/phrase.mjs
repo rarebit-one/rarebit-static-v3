@@ -47,7 +47,7 @@ ${JSON.stringify(forModel, null, 2)}
 
 Produce STRICT JSON (no markdown, no prose around it) with this shape:
 {
-  "digest": "one sentence, <= 140 chars, summarizing the day — reference run count, that it spans private systems, the category mix, and the green %. Do NOT name systems or counts of systems beyond what's in totals.",
+  "digest": "one sentence, <= 140 chars, summarizing the day — reference run count, that it spans private systems, the category mix, and the green %. The ONLY numbers you may write are the exact totals values provided (runs, systems, green %). Do NOT include a year, date, time, or any other number, and do not name systems or counts beyond totals.",
   "phrases": {
     "<category>": ["variant 1", "variant 2", "variant 3"]
   }
@@ -56,7 +56,7 @@ Produce STRICT JSON (no markdown, no prose around it) with this shape:
 Rules for phrases:
 - One key per category present in "categories". 2-3 variants each.
 - Each variant is a short generic status line a factory ticker would show, e.g. "deployment completed", "test suite ran clean", "scheduled job finished". <= 48 chars.
-- Generic ONLY — never reference a client, product, repo, person, URL, or specific number.
+- Generic ONLY — never reference a client, product, repo, person, URL, or ANY number (no counts, dates, years, or times). Plain status words only.
 - Do not append the outcome (green/failed) — the assembler adds that.`;
 
 let text;
