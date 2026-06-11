@@ -89,7 +89,9 @@ Markdown.
 
 Claiming matters because actors run on schedules and may overlap; `claimIssue`
 marks an item taken before the slow work begins. Success closes; failure never
-closes — the queue self-heals by retrying open items.
+closes — the queue self-heals by retrying open items. `closeIssue` leaves the
+`in-progress` label in place: a closed issue is terminal, and actors only ever
+query the *open* set, so the label needs no cleanup once closed.
 
 ## Two firm boundaries
 
