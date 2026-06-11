@@ -15,6 +15,7 @@
 // Output: argv[3] (default ./draft.json) — { title, description, slug, body }
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { voiceHeader } from "../lib/voice.mjs";
 
 const IN = process.argv[2] ?? "facts.json";
 const OUT = process.argv[3] ?? "draft.json";
@@ -38,9 +39,9 @@ const forModel = {
   private: facts.private ? (({ blocklist, ...rest }) => rest)(facts.private) : facts.private,
 };
 
-const system = `You write a weekly Field Note for rarebit.one, an AI automation studio (small team, agents with humans in the loop). Voice: calm, concrete, factual. No hype, no marketing adjectives (no "powerful", "seamless", "robust", "cutting-edge"), no emoji. British/neutral spelling.
+const system = `${voiceHeader()}
 
-Ground EVERY claim in the provided facts — never invent metrics, names, dates, or links.
+You are writing this week's Field Note — a calm, concrete log entry, not a marketing post. Use ## section headings.
 
 PUBLIC work may be named and linked, using ONLY the repo names, PR titles, and URLs given in the facts. Do not construct or guess any other URL.
 
