@@ -118,7 +118,7 @@ Return ONLY a JSON object, no prose, no markdown fences:
 
 Block (verdict "blocking") ONLY when the diff contains at least one of:
 - A correctness bug that would break the page or produce wrong output.
-- A security issue (leaked secret/token, injection, unsafe handling of untrusted input).
+- A security issue: a secret/token VALUE hardcoded in the diff, a secret echoed to logs or written to an artifact, command/script injection, or unsafe handling of untrusted input. (Reading repository secrets or variables into workflow env via the Actions secrets/vars context, declaring \`permissions:\`, or passing a token to a step, is the STANDARD, correct GitHub Actions pattern — NOT a vulnerability; never flag it.)
 - A change that would break the build or type-check (astro check), or invalid YAML/JS that fails CI.
 - A violation of the repo's content invariants:
   * a leaked CLIENT or PRIVATE identifier (client name, private repo name, login, internal URL, real customer data),
@@ -128,6 +128,7 @@ Block (verdict "blocking") ONLY when the diff contains at least one of:
 Do NOT block on:
 - Style nitpicks, naming preferences, formatting, comment wording.
 - Subjective "could be cleaner" suggestions.
+- Standard GitHub Actions secret/token handling (secrets or vars in env, GITHUB_TOKEN or a PAT's permissions and usage) — expected, not a finding.
 - Anything the existing automated checks (lint/types/build/link-check) already cover and that looks fine here.
 
 This gate must be passable on a clean first try for a well-made PR. When in doubt
