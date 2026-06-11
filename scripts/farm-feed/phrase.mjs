@@ -15,6 +15,7 @@
 // Output: argv[3] (default ./phrased.json) — { digest, phrases: {cat: [...]} }
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { voiceHeader } from "../lib/voice.mjs";
 
 const IN = process.argv[2] ?? "sanitized.json";
 const OUT = process.argv[3] ?? "phrased.json";
@@ -36,7 +37,9 @@ const sanitized = JSON.parse(readFileSync(IN, "utf8"));
 // to see repo names or member logins, even to avoid them.
 const { blocklist, ...forModel } = sanitized;
 
-const system = `You write a terse, factual activity ticker for an AI automation company's marketing site. The data is already anonymized to category counts — you NEVER invent specifics. Tone: a calm factory log. No hype, no adjectives like "powerful" or "seamless", no emoji. British/neutral spelling.`;
+const system = `${voiceHeader()}
+
+You are writing a terse activity ticker — a calm factory log. The data is already anonymized to category counts; phrase it, never invent specifics. Keep lines short and plain; no self-aware asides at this length.`;
 
 const prompt = `Here is yesterday's aggregated private-workflow activity (categories + counts only, fully anonymized):
 

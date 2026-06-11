@@ -3,7 +3,7 @@ export const site = {
   domain: "rarebit.one",
   title: "Rarebit — One AI. Endless Output.",
   description:
-    "Rarebit runs an AI automation farm: agents and automations handle the workflows, humans direct, review, and ship. Small teams. Impossible things.",
+    "Rarebit runs an AI automation farm: agents and automations handle the workflows, humans direct, review, and ship. The site you're reading is one of them. Small teams. Impossible things.",
   email: "hello@rarebit.one",
   github: "https://github.com/rarebit-one",
   // MCP endpoint surfaced on /connect — the front door for AI assistants.
