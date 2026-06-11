@@ -73,7 +73,10 @@ for (const term of raw.blocklist ?? []) {
 
 // 2. EMAIL / @handle — none belong in an idea-seed.
 if (/[\w.+-]+@[\w-]+\.[\w.-]+/.test(blob)) fail("seed contains an email address");
-if (/(^|[\s(])@\w/.test(blob)) fail("seed contains an @handle");
+// @handle in ANY non-word position — start, or after whitespace/punctuation
+// (",@user", "/@user", "[@user"). A bare [\s(] class missed those. Emails are
+// caught above; "." before @ is excluded so this doesn't double-flag them.
+if (/(^|[^\w.])@\w/.test(blob)) fail("seed contains an @handle");
 
 // 3. URL ALLOWLIST — every URL must trace to the facts. The allowlist is the
 //    set of public item URLs from the raw, plus the org-public repo prefixes
