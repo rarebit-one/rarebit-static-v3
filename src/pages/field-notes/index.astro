@@ -3,7 +3,6 @@ import { getCollection } from "astro:content";
 import Layout from "../../layouts/Layout.astro";
 import Section from "../../components/Section.astro";
 import Heading from "../../components/Heading.astro";
-import HeroBanner from "../../components/HeroBanner.astro";
 
 const notes = (await getCollection("fieldNotes")).sort(
   (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
@@ -26,13 +25,6 @@ const formatDate = (date: Date) =>
         tag="Build logs from the farm"
         title="Field notes"
         text="What we shipped, what broke, and what we learned. Agent-drafted, human-reviewed — like everything else here."
-      />
-
-      <HeroBanner
-        src="/images/rarebit/dashboard-factory.webp"
-        alt="The farm's live operations floor"
-        class="max-w-[50rem] mx-auto mb-12 md:mb-16"
-        aspect="aspect-[16/5]"
       />
 
       <div class="max-w-[50rem] mx-auto">
