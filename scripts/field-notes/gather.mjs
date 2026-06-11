@@ -14,20 +14,35 @@
 //     field other than `blocklist` — the drafter never sees them, and the
 //     validator (step 3) hard-fails if any leak into the note.
 //
-// Also reads existing field notes for back-linking (`pastNotes`).
+// Also reads existing field notes for back-linking (`pastNotes`), and — when
+// Spaces credentials are present — pulls the rolling idea-seed notebook (a
+// PRIVATE object the daily notebook scout maintains) so the drafter can mine
+// its `angle`/`grounding` pairs as OPTIONAL candidate angles. Only the seeds'
+// angles + grounding URLs are carried into facts — never any raw scout
+// internals — and the validator (step 3) remains the sole gate regardless.
 //
 // Token: prefers FEED_GITHUB_PAT, falls back to GITHUB_TOKEN. Missing both →
 // exit 0 with a notice so the workflow no-ops gracefully until secrets are
-// wired up.
+// wired up. Notebook fetch is best-effort: missing creds or a missing object
+// just omits the `notebook` key — it never fails the gather.
 //
 // Output: writes facts.json to the path in argv[2] (default ./facts.json).
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash, createHmac } from "node:crypto";
 
 const ORG = "rarebit-one";
 const TOKEN = process.env.FEED_GITHUB_PAT || process.env.GITHUB_TOKEN;
 const OUT = process.argv[2] ?? "facts.json";
 const TZ_OFFSET = "+08:00"; // SGT — the farm runs on Singapore time
+
+// Notebook (idea-seed) source — the same DO Spaces bucket + channel as
+// farm-feed, but a PRIVATE object, so it's fetched with SigV4-signed creds.
+const SPACES_KEY_ID = process.env.SPACES_KEY_ID;
+const SPACES_SECRET = process.env.SPACES_SECRET;
+const SPACES_BUCKET = process.env.BUCKET || "rarebit-farm-feed";
+const SPACES_REGION = process.env.SPACES_REGION || "sgp1";
+const CHANNEL = process.env.FARM_FEED_CHANNEL || process.env.CHANNEL || "staging";
 
 if (!TOKEN) {
   console.log("gather: no FEED_GITHUB_PAT / GITHUB_TOKEN set — skipping (graceful no-op).");
@@ -64,6 +79,84 @@ async function gh(path) {
   });
   if (!response.ok) throw new Error(`GitHub ${path} → ${response.status}`);
   return response.json();
+}
+
+// --- Notebook fetch (SigV4-signed GET of a PRIVATE Spaces object) ----------
+// Self-contained AWS SigV4 (S3, payload-less GET) so we can read the private
+// notebook with no SDK dependency. Best-effort: any failure (no creds, 404,
+// network, malformed JSON) returns null and the gather proceeds without seeds.
+const sha256Hex = (s) => createHash("sha256").update(s).digest("hex");
+const hmac = (key, s) => createHmac("sha256", key).update(s).digest();
+
+async function fetchNotebookSeeds() {
+  if (!SPACES_KEY_ID || !SPACES_SECRET) {
+    console.log("gather: SPACES creds not set — skipping notebook fetch (no seeds).");
+    return null;
+  }
+  const host = `${SPACES_BUCKET}.${SPACES_REGION}.digitaloceanspaces.com`;
+  const key = `/${CHANNEL}/notebook.json`;
+  const service = "s3";
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, ""); // YYYYMMDDTHHMMSSZ
+  const dateStamp = amzDate.slice(0, 8);
+  const payloadHash = sha256Hex(""); // empty body
+  const canonicalHeaders =
+    `host:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
+  const signedHeaders = "host;x-amz-content-sha256;x-amz-date";
+  const canonicalRequest = [
+    "GET",
+    key,
+    "", // no query
+    canonicalHeaders,
+    signedHeaders,
+    payloadHash,
+  ].join("\n");
+  const scope = `${dateStamp}/${SPACES_REGION}/${service}/aws4_request`;
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    amzDate,
+    scope,
+    sha256Hex(canonicalRequest),
+  ].join("\n");
+  let signingKey = hmac(`AWS4${SPACES_SECRET}`, dateStamp);
+  signingKey = hmac(signingKey, SPACES_REGION);
+  signingKey = hmac(signingKey, service);
+  signingKey = hmac(signingKey, "aws4_request");
+  const signature = createHmac("sha256", signingKey).update(stringToSign).digest("hex");
+  const authorization =
+    `AWS4-HMAC-SHA256 Credential=${SPACES_KEY_ID}/${scope}, ` +
+    `SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+  try {
+    const res = await fetch(`https://${host}${key}`, {
+      headers: {
+        Host: host,
+        "x-amz-date": amzDate,
+        "x-amz-content-sha256": payloadHash,
+        Authorization: authorization,
+      },
+    });
+    if (res.status === 404) {
+      console.log("gather: notebook object not found (404) — proceeding without seeds.");
+      return null;
+    }
+    if (!res.ok) {
+      console.log(`gather: notebook fetch ${res.status} — proceeding without seeds.`);
+      return null;
+    }
+    const data = JSON.parse(await res.text());
+    const seeds = Array.isArray(data?.seeds) ? data.seeds : [];
+    // Carry ONLY angle + grounding — never raw scout internals (at/window/etc).
+    return seeds
+      .filter((s) => s && typeof s.angle === "string" && s.angle.trim() !== "")
+      .map((s) => ({
+        angle: s.angle.trim(),
+        grounding: (Array.isArray(s.grounding) ? s.grounding : []).filter((u) => typeof u === "string"),
+      }));
+  } catch (error) {
+    console.log(`gather: notebook fetch failed (${error.message}) — proceeding without seeds.`);
+    return null;
+  }
 }
 
 // Workflow-name → category. Copied verbatim from farm-feed/gather.mjs so the
@@ -199,6 +292,11 @@ async function main() {
   const greenRuns = events.filter((e) => e.ok).reduce((sum, e) => sum + e.count, 0);
   const greenPct = runs ? Math.round((greenRuns / runs) * 100) : 100;
 
+  // OPTIONAL idea-seeds from the rolling notebook (best-effort; null if creds
+  // or object absent). Only angle + grounding are carried — these are candidate
+  // angles for the drafter, NOT facts to assert; the validator still gates URLs.
+  const notebookSeeds = await fetchNotebookSeeds();
+
   const facts = {
     window: { from, to },
     public: {
@@ -213,12 +311,14 @@ async function main() {
       blocklist,
     },
     pastNotes: readPastNotes(),
+    ...(notebookSeeds && notebookSeeds.length ? { notebook: notebookSeeds } : {}),
   };
 
   writeFileSync(OUT, JSON.stringify(facts, null, 2));
   console.log(
     `gather: ${prs.length} public PRs, ${releases.length} releases, ` +
-      `${runs} private runs across ${privateRepos.length} systems → ${OUT}`
+      `${runs} private runs across ${privateRepos.length} systems` +
+      `${notebookSeeds ? `, ${notebookSeeds.length} notebook seeds` : ""} → ${OUT}`
   );
 }
 
