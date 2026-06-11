@@ -6,26 +6,29 @@ name: Field notes
 # claude-opus-4-8 call, grounded only in those facts) → validate (the SOLE
 # pre-publish gate: hard-fails on any private blocklist identifier,
 # off-allowlist URL, email/@handle, or dead internal link; no-ops a thin
-# week) → auto-commit the markdown to main. There is NO human review between
-# draft and publish, so validate.mjs is the only safety boundary; it is
+# week) → open an `auto-land` PR with the markdown. There is NO human review
+# between draft and publish, so validate.mjs is the only safety boundary; it is
 # locked by scripts/field-notes/validate.test.mjs (run via `npm test` in CI).
 #
-# Missing any secret → the relevant step no-ops (exit 0) and nothing is
-# committed, so the workflow stays green until both are wired up:
-#   FEED_GITHUB_PAT · ANTHROPIC_API_KEY
+# PR PATH (issue #29): instead of committing straight to main, a validated note
+# is pushed to a `field-notes/<slug>` branch and opened as an `auto-land` PR via
+# AUTOLAND_PAT, so CI + review-verdict actually run. The gated auto-land sweeper
+# then merges it once green + review-clear — no separate branch-protection
+# carve-out for a bot is needed.
 #
-# NB: pushing the commit directly to main requires that branch protection
-# permits the github-actions bot to push. If main is protected against direct
-# pushes, the maintainer must allow the bot (or this workflow) in settings;
-# otherwise the push step fails and the note is not published.
+# Missing any secret → the relevant step no-ops (exit 0) and nothing is
+# committed, so the workflow stays green until secrets are wired up:
+#   FEED_GITHUB_PAT · ANTHROPIC_API_KEY · AUTOLAND_PAT
 
 on:
   schedule:
     - cron: "0 22 * * 0"
   workflow_dispatch:
 
+# The branch push + PR are done with AUTOLAND_PAT (a real-user token), so CI and
+# review-verdict trigger. The workflow's own GITHUB_TOKEN only needs read here.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: field-notes
@@ -38,9 +41,14 @@ jobs:
     env:
       FEED_GITHUB_PAT: ${{ secrets.FEED_GITHUB_PAT }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      AUTOLAND_PAT: ${{ secrets.AUTOLAND_PAT }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Use the PAT so the branch push triggers CI + review-verdict (a
+          # GITHUB_TOKEN push would not). Empty when the secret is unset — the
+          # publish step below no-ops in that case, keeping the workflow green.
+          token: ${{ secrets.AUTOLAND_PAT }}
 
       - uses: actions/setup-node@v4
         with:
@@ -60,14 +68,36 @@ jobs:
           fi
           node scripts/field-notes/validate.mjs facts.json draft.json src/content/field-notes/
 
-      - name: Commit the new note (if any)
+      - name: Open an auto-land PR for the new note (if any)
+        env:
+          GH_TOKEN: ${{ secrets.AUTOLAND_PAT }}
         run: |
           if [ -z "$(git status --porcelain src/content/field-notes)" ]; then
-            echo "No new note (thin week or no-op) — nothing to commit."
+            echo "No new note (thin week or no-op) — no branch, no PR."
             exit 0
           fi
+          if [ -z "${AUTOLAND_PAT:-}" ]; then
+            echo "AUTOLAND_PAT not set — cannot open a PR; skipping (note left uncommitted)."
+            exit 0
+          fi
+
+          # Derive a branch from the new note's filename (its slug). validate.mjs
+          # writes src/content/field-notes/<slug>.md (optionally -<date> on clash).
+          note_file="$(git status --porcelain src/content/field-notes \
+            | awk '{print $2}' | grep '\.md$' | head -n1)"
+          slug="$(basename "$note_file" .md)"
+          branch="field-notes/${slug}"
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
           git add src/content/field-notes
-          git commit -m "Field notes: weekly entry"
-          git push
+          git commit -m "Field notes: weekly entry (${slug})"
+          git push --set-upstream origin "$branch"
+
+          gh pr create \
+            --title "Field notes: ${slug}" \
+            --body "Auto-drafted weekly Field Note (validated by scripts/field-notes/validate.mjs). Opened on the gated auto-land path (issue #29): CI + review-verdict run, then the sweeper merges once green + review-clear." \
+            --label auto-land \
+            --base main \
+            --head "$branch"

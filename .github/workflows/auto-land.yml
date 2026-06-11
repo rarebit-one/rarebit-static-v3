@@ -1,0 +1,61 @@
+name: Auto-land
+
+# Event-driven sweeper for gated auto-land (issue #29). Scoped to THIS repo —
+# a deliberate, documented exception to workspace CLAUDE.md Rule #7 (see this
+# repo's CLAUDE.md "Gated auto-land" section). Governance elsewhere is unchanged.
+#
+# A PR auto-merges (squash + delete branch) once it is reviewed + green, with NO
+# human merge step. Eligibility keys on the `auto-land` LABEL, not author
+# identity — the merge is performed with AUTOLAND_PAT (a real user token), so
+# downstream push/workflow_run jobs (deploy.yml) fire. GITHUB_TOKEN-performed
+# merges do NOT trigger those, which is why the PAT is required.
+#
+# DRY-RUN by default: unless repo variable AUTOLAND_LIVE == "true", the sweeper
+# logs "would land #N" and merges nothing. This lets us ship the sweeper safely
+# before flipping it live (`gh variable set AUTOLAND_LIVE --body true`).
+#
+# Required contexts (ALL must be success in the PR's statusCheckRollup):
+#   Type-check & build · Link check · claude-review/clear
+# Advisory "Lighthouse (advisory)" is NOT required; a rollup left UNSTABLE only
+# by Lighthouse must still be allowed to land.
+
+on:
+  check_suite:
+    types: [completed]
+  pull_request_review:
+    types: [submitted]
+  status:
+  pull_request_target:
+    types: [labeled]
+  schedule:
+    - cron: "*/30 * * * *" # safety net in case an event is missed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: read
+  checks: read
+
+concurrency:
+  group: auto-land
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    name: Sweep eligible PRs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # gh CLI default token — used for READS (listing PRs, comments, rollup).
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Real-user PAT — used ONLY for the merge, so downstream CI/deploy fire.
+      AUTOLAND_PAT: ${{ secrets.AUTOLAND_PAT }}
+      AUTOLAND_LIVE: ${{ vars.AUTOLAND_LIVE }}
+      OWNER: ${{ github.repository_owner }}
+      REPO: ${{ github.event.repository.name || github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sweep
+        run: node .github/scripts/auto-land.mjs
