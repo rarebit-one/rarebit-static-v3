@@ -95,6 +95,12 @@ const artifact = {
   window: sanitized.window,
   digest: phrased.digest,
   events,
+  // Deterministic gather output — already the validator's number allow-list
+  // (totals) and the category set used to phrase. Carrying them through does
+  // NOT widen what the LLM can emit: these never pass through the model. The
+  // dashboard reads them for headline metrics + the category breakdown.
+  totals: sanitized.totals,
+  categories: sanitized.categories,
 };
 
 writeFileSync(OUT, JSON.stringify(artifact));

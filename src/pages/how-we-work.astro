@@ -1,0 +1,158 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Section from "../components/Section.astro";
+import Heading from "../components/Heading.astro";
+import Tagline from "../components/Tagline.astro";
+import Button from "../components/Button.astro";
+import Collaboration from "../components/sections/Collaboration.astro";
+import { howWeWork } from "../data/howWeWork";
+import { site } from "../data/site";
+import {
+  mergedPrCount,
+  recentMerges,
+  totalGemDownloads,
+  compactNumber,
+  shortDate,
+  buildStamp,
+} from "../lib/farm";
+
+// Live self-demo: the page proves its own claims with real, build-time facts.
+// Every fetcher is null on API flake — the strip degrades gracefully, never
+// breaks the build. The gem set mirrors /open-source's source-of-truth list.
+const GEMS = [
+  "standard_id",
+  "standard_singpass",
+  "standard_circuit",
+  "standard_health",
+  "standard_audit",
+  "standard_ledger",
+];
+
+const [prs30, merges, downloads] = await Promise.all([
+  mergedPrCount(30),
+  recentMerges(3),
+  totalGemDownloads(GEMS),
+]);
+const stamp = buildStamp();
+---
+
+<Layout title={howWeWork.meta.title} description={howWeWork.meta.description}>
+  <Section crosses>
+    <div class="container">
+      <Heading
+        level={1}
+        tag={howWeWork.hero.tag}
+        title={howWeWork.hero.title}
+        text={howWeWork.hero.text}
+      />
+
+      {/* The arc — one mechanism per step, all real. */}
+      <div class="max-w-[55rem] mx-auto">
+        {
+          howWeWork.steps.map((step) => (
+            <div class="reveal relative mb-5 p-6 border border-n-1/10 rounded-3xl bg-n-7 overflow-hidden transition-colors hover:border-brand-cyan/30 md:p-8 xl:p-10">
+              <div class="absolute top-0 left-0 max-w-full opacity-40 pointer-events-none">
+                <img class="w-full" src="/images/grid.png" width="550" height="550" alt="" />
+              </div>
+              <div class="relative z-1">
+                <Tagline class="mb-4">{step.tag}</Tagline>
+                <h3 class="h4 mb-4">{step.title}</h3>
+                <p class="body-2 text-n-3">{step.body}</p>
+                {step.id === "contact" && (
+                  <a
+                    class="button inline-flex items-center mt-5 text-brand-cyan transition-colors hover:text-brand-magenta"
+                    href="/connect"
+                  >
+                    <code class="font-code text-xs">{site.mcpEndpoint}</code>
+                  </a>
+                )}
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </Section>
+
+  {/* Live self-demo stats strip — the page demonstrating the claims above. */}
+  <Section customPaddings class="py-10 lg:py-16">
+    <div class="container">
+      <div class="relative p-0.25 rounded-3xl bg-conic-gradient">
+        <div class="relative p-8 bg-n-8 rounded-[1.4375rem] overflow-hidden md:p-12">
+          <div class="absolute top-0 left-0 max-w-full opacity-30 pointer-events-none">
+            <img class="w-full" src="/images/grid.png" width="550" height="550" alt="" />
+          </div>
+          <div class="relative z-1">
+            <Tagline class="mb-8">Receipts · this page, proving itself</Tagline>
+            <div class="grid gap-8 md:grid-cols-3">
+              <div>
+                <div class="h3 text-n-1">{prs30 !== null ? compactNumber(prs30) : "—"}</div>
+                <p class="body-2 mt-2 text-n-4">
+                  public PRs merged across the org in the last 30 days
+                </p>
+              </div>
+              <div>
+                <div class="h3 text-n-1">
+                  {downloads !== null ? compactNumber(downloads) : "—"}
+                </div>
+                <p class="body-2 mt-2 text-n-4">
+                  total downloads of the open-source gems the farm runs on
+                </p>
+              </div>
+              <div>
+                <div class="h3 font-code text-brand-cyan text-2xl leading-tight">{stamp}</div>
+                <p class="body-2 mt-2 text-n-4">this page rebuilt at, in farm-local time</p>
+              </div>
+            </div>
+
+            {
+              merges && (
+                <div class="mt-10">
+                  <div class="tagline mb-3 text-n-4">Most recent merges — linkable, public</div>
+                  <ul class="font-code text-xs leading-6 text-n-3">
+                    {merges.map((merge) => (
+                      <li class="flex items-baseline gap-3 py-2 border-t border-n-6 last:border-b min-w-0">
+                        <a
+                          class="shrink-0 text-brand-cyan transition-colors hover:text-brand-magenta"
+                          href={merge.url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {merge.repo}#{merge.number}
+                        </a>
+                        <span class="truncate">{merge.title}</span>
+                        <span class="ml-auto shrink-0 text-n-4">{shortDate(merge.mergedAt)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            }
+
+            {
+              prs30 === null && downloads === null && !merges && (
+                <p class="body-2 mt-8 text-n-4">
+                  Live numbers are catching their breath — the public APIs didn't answer this
+                  build. The mechanisms above stand on their own.
+                </p>
+              )
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  </Section>
+
+  {/* The tool orbit + principles, reused from the home section (no teaser CTA). */}
+  <Collaboration />
+
+  <Section class="text-center">
+    <div class="container max-w-[40rem]">
+      <h2 class="h3 mb-4">{howWeWork.close.title}</h2>
+      <p class="body-1 mb-8 text-n-3">{howWeWork.close.text}</p>
+      <div class="flex justify-center">
+        <Button href="/connect">{howWeWork.close.cta}</Button>
+      </div>
+    </div>
+  </Section>
+</Layout>

@@ -1,0 +1,420 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Section from "../components/Section.astro";
+import Heading from "../components/Heading.astro";
+import Tagline from "../components/Tagline.astro";
+import Button from "../components/Button.astro";
+import Generating from "../components/Generating.astro";
+import {
+  recentMerges,
+  mergedPrCount,
+  shortDate,
+  farmReplay,
+  farmTrend,
+  FARM_FEED_URL,
+} from "../lib/farm";
+
+// --- Private client-work feed (24h-delayed, validator-gated) -----------------
+// SSR digest + headline totals from the rolling artifact. Null until the
+// nightly pipeline publishes. Freshness guard mirrors the home section: only
+// surface the digest if the window is within the last two days (SGT). The
+// client script below replays yesterday's events on a fixed 24h delay and
+// refreshes both the digest and the headline totals at runtime.
+const replay = await farmReplay();
+const freshReplay = (() => {
+  if (!replay?.window) return null;
+  const days = (Date.now() - Date.parse(`${replay.window}T00:00:00+08:00`)) / 86_400_000;
+  return days >= 0 && days <= 2 ? replay : null;
+})();
+const totals = freshReplay?.totals ?? null;
+const freshDigest = freshReplay?.digest ?? null;
+
+// Category breakdown — prefer the artifact's category list, else aggregate the
+// events by kind. Empty until the feed has data.
+const categoryCounts = (() => {
+  if (!freshReplay?.events?.length) return [];
+  const counts = new Map<string, number>();
+  for (const event of freshReplay.events) {
+    counts.set(event.kind, (counts.get(event.kind) ?? 0) + 1);
+  }
+  const ordered = freshReplay.categories?.length
+    ? freshReplay.categories
+    : [...counts.keys()];
+  return ordered
+    .map((kind) => ({ kind, count: counts.get(kind) ?? 0 }))
+    .filter((c) => c.count > 0);
+})();
+const maxCategory = Math.max(1, ...categoryCounts.map((c) => c.count));
+
+// Trend over the last N windows. Missing days are gaps (null), never errors —
+// a dormant bucket yields all-null points and the strip shows an empty state.
+const trend = await farmTrend(7);
+const trendBars = trend.map((point) => ({
+  date: point.date,
+  runs: point.data?.totals?.runs ?? null,
+}));
+const maxRuns = Math.max(1, ...trendBars.map((b) => b.runs ?? 0));
+const hasTrend = trendBars.some((b) => b.runs !== null);
+
+// --- Public "what shipped this week" lane (non-delayed) ----------------------
+const [shipped, prs7] = await Promise.all([recentMerges(3), mergedPrCount(7)]);
+
+// Whether the private feed has any live data at all this build.
+const feedDormant = !freshReplay;
+---
+
+<Layout
+  title="Operations — Rarebit"
+  description="The live operations dashboard: runs, systems, green rate, a category breakdown, a 24h-delayed client-work feed, and what shipped this week — straight off the farm."
+>
+  <Section crosses>
+    <div class="container">
+      <Heading
+        level={1}
+        tag="The farm never sleeps"
+        title="Operations"
+        text="What the farm did, in numbers and receipts. Private client work is replayed on a fixed 24-hour delay and anonymized; public work is shown as it lands."
+      />
+
+      {/* (2) Headline metrics — SSR, client-refreshed below. */}
+      <div class="mb-12" data-totals>
+        <div class="grid gap-5 md:grid-cols-3">
+          {
+            [
+              { key: "runs", label: "Automation runs", value: totals?.runs },
+              { key: "systems", label: "Systems on watch", value: totals?.systems },
+              { key: "greenPct", label: "Green rate", value: totals?.greenPct, suffix: "%" },
+            ].map((metric) => (
+              <div class="relative p-6 border border-n-1/10 rounded-3xl bg-n-7 overflow-hidden md:p-8">
+                <div class="absolute top-0 left-0 max-w-full opacity-30 pointer-events-none">
+                  <img class="w-full" src="/images/grid.png" width="550" height="550" alt="" />
+                </div>
+                <div class="relative z-1">
+                  <div class="h2 text-n-1">
+                    <span data-metric={metric.key}>
+                      {typeof metric.value === "number" ? metric.value : "—"}
+                    </span>
+                    {metric.suffix && (
+                      <span data-suffix={metric.key} hidden={typeof metric.value !== "number"}>
+                        {metric.suffix}
+                      </span>
+                    )}
+                  </div>
+                  <p class="body-2 mt-2 text-n-4">{metric.label}</p>
+                </div>
+              </div>
+            ))
+          }
+        </div>
+        {
+          feedDormant && (
+            <p class="body-2 mt-5 text-n-4">
+              The farm is warming up — live client-work numbers appear here once the feed is
+              connected. The public ledger below is already running.
+            </p>
+          )
+        }
+      </div>
+
+      {/* (3) Trend over the last 7 windows — CSS-only bars. */}
+      <div class="mb-12">
+        <Tagline class="mb-5">Runs over the last 7 windows</Tagline>
+        {
+          hasTrend ? (
+            <div class="flex items-end gap-2 h-32 md:gap-3">
+              {trendBars.map((bar) => (
+                <div class="flex flex-1 flex-col items-center justify-end h-full">
+                  <div
+                    class="reveal w-full rounded-t bg-conic-gradient"
+                    style={`height: ${bar.runs ? Math.max(4, Math.round((bar.runs / maxRuns) * 100)) : 1}%`}
+                    title={bar.runs !== null ? `${bar.runs} runs` : "no data"}
+                  />
+                  <span class="tagline mt-2 text-[0.5rem] text-n-4">{bar.date.slice(5)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p class="body-2 text-n-4">
+              No windows published yet — the trend fills in once the nightly feed has run a few
+              days.
+            </p>
+          )
+        }
+      </div>
+
+      {/* (4) Category breakdown. */}
+      {
+        categoryCounts.length > 0 && (
+          <div class="mb-12">
+            <Tagline class="mb-5">What the farm worked on</Tagline>
+            <ul class="space-y-3">
+              {categoryCounts.map((cat) => (
+                <li class="flex items-center gap-4">
+                  <span class="w-32 shrink-0 body-2 text-n-3 capitalize">{cat.kind}</span>
+                  <span class="relative flex-1 h-2 bg-n-6 rounded-full overflow-hidden">
+                    <span
+                      class="absolute inset-y-0 left-0 rounded-full bg-brand-cyan/70"
+                      style={`width: ${Math.round((cat.count / maxCategory) * 100)}%`}
+                    />
+                  </span>
+                  <span class="font-code text-xs text-n-4 w-8 text-right">{cat.count}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      }
+    </div>
+  </Section>
+
+  {/* (5) The 24h-delayed live client-work feed. */}
+  <Section customPaddings class="py-10 lg:py-16">
+    <div class="container">
+      <div
+        class="relative p-6 border border-n-1/10 rounded-3xl bg-n-7 overflow-hidden md:p-10"
+        data-farm-feed
+        data-replay-url={FARM_FEED_URL}
+      >
+        <div class="flex items-center justify-between mb-6">
+          <Tagline>Client work · replayed on a 24h delay</Tagline>
+          <Generating label="Delayed ticker · live" class="hidden border border-n-1/10 md:flex" />
+        </div>
+        <ul class="font-code text-xs leading-6 text-n-3" data-feed-list>
+          {
+            !freshReplay && (
+              <li class="py-2 text-n-4" data-feed-empty>
+                Waiting for the feed — anonymized client-work events replay here on a fixed
+                24-hour delay once the pipeline is connected.
+              </li>
+            )
+          }
+        </ul>
+        <p class="caption mt-4 text-n-4/70" data-feed-digest hidden={!freshDigest}>
+          {
+            freshDigest && (
+              <>
+                Client work · {freshDigest}{" "}
+                <span class="text-n-4/50">(replayed on a 24h delay)</span>
+              </>
+            )
+          }
+        </p>
+      </div>
+    </div>
+  </Section>
+
+  {/* (6) Public "what shipped this week" lane — visually distinct, non-delayed. */}
+  <Section customPaddings class="py-10 lg:py-16">
+    <div class="container">
+      <div class="relative p-0.25 rounded-3xl bg-conic-gradient">
+        <div class="relative p-6 bg-n-8 rounded-[1.4375rem] overflow-hidden md:p-10">
+          <div class="absolute top-0 left-0 max-w-full opacity-30 pointer-events-none">
+            <img class="w-full" src="/images/grid.png" width="550" height="550" alt="" />
+          </div>
+          <div class="relative z-1">
+            <div class="flex items-center justify-between mb-6">
+              <Tagline>What shipped this week · public, as it lands</Tagline>
+              {
+                prs7 !== null && (
+                  <span class="font-code text-xs text-brand-cyan">
+                    {prs7} merged in 7 days
+                  </span>
+                )
+              }
+            </div>
+            {
+              shipped ? (
+                <ul class="font-code text-xs leading-6 text-n-3">
+                  {shipped.map((merge) => (
+                    <li class="flex items-baseline gap-3 py-2 border-t border-n-6 last:border-b min-w-0">
+                      <a
+                        class="shrink-0 text-brand-cyan transition-colors hover:text-brand-magenta"
+                        href={merge.url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {merge.repo}#{merge.number}
+                      </a>
+                      <span class="truncate">{merge.title}</span>
+                      <span class="ml-auto shrink-0 text-n-4">{shortDate(merge.mergedAt)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p class="body-2 text-n-4">
+                  No public merges to show this build — the GitHub API didn't answer.
+                </p>
+              )
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  </Section>
+
+  {/* (7) CTA. */}
+  <Section class="text-center">
+    <div class="container max-w-[40rem]">
+      <h2 class="h3 mb-4">Point the farm at your queue</h2>
+      <p class="body-1 mb-8 text-n-3">
+        This is our own operations feed. Client engagements get the same dashboard, scoped to
+        your work.
+      </p>
+      <div class="flex justify-center">
+        <Button href="/connect">Start a conversation</Button>
+      </div>
+    </div>
+  </Section>
+</Layout>
+
+<script>
+  // Client-work replay lane (lifted from the home Operations section). Reads
+  // the nightly-published artifact and reveals each event into the feed list on
+  // a fixed real-time + 24h delay — a delayed ticker. No-ops silently until the
+  // bucket has data (404 → return), so the SSR digest + headline totals stand
+  // on their own. Replay-only: no live GitHub feed. The published text is
+  // already validator-gated; rows are still built with textContent (never
+  // innerHTML) as defence in depth. This page additionally refreshes the
+  // headline totals from the same fresh artifact.
+  const feed = document.querySelector<HTMLElement>("[data-farm-feed]");
+  const list = feed?.querySelector<HTMLUListElement>("[data-feed-list]");
+  const digestEl = feed?.querySelector<HTMLElement>("[data-feed-digest]");
+  const emptyEl = list?.querySelector<HTMLElement>("[data-feed-empty]");
+  const totalsBox = document.querySelector<HTMLElement>("[data-totals]");
+  const DELAY_MS = 24 * 60 * 60 * 1000;
+
+  type Scheduled = { id: string; text: string; displayAt: number; revealed: boolean };
+
+  // Yesterday's date in SGT (UTC+8) as YYYY-MM-DD — the window the pipeline
+  // labels its artifact with. Shift now into SGT wall-clock, step back a day.
+  const yesterdaySgt = () => {
+    const sgt = new Date(Date.now() + 8 * 3_600_000);
+    sgt.setUTCDate(sgt.getUTCDate() - 1);
+    return sgt.toISOString().slice(0, 10);
+  };
+
+  // The build-frozen digest may be days old (weekly rebuild), so the client
+  // owns this line at runtime: refresh from a fresh artifact, hide otherwise —
+  // never leave a stale line labelled "24h delay".
+  const setDigest = (text: string | null) => {
+    if (!digestEl) return;
+    if (!text) {
+      digestEl.hidden = true;
+      return;
+    }
+    digestEl.textContent = `Client work · ${text} `;
+    const note = document.createElement("span");
+    note.className = "text-n-4/50";
+    note.textContent = "(replayed on a 24h delay)";
+    digestEl.appendChild(note);
+    digestEl.hidden = false;
+  };
+
+  // Refresh the SSR headline totals from a fresh artifact. Only numeric fields
+  // are written, via textContent — never innerHTML.
+  const setTotals = (totals: Record<string, unknown> | null) => {
+    if (!totalsBox || !totals) return;
+    for (const key of ["runs", "systems", "greenPct"]) {
+      const el = totalsBox.querySelector<HTMLElement>(`[data-metric="${key}"]`);
+      const value = totals[key];
+      if (el && typeof value === "number") {
+        el.textContent = String(value);
+        // Reveal the unit suffix (e.g. "%") hidden while dormant, so a cold-start
+        // build that activates client-side shows "96%", not a bare "96".
+        const suffix = totalsBox.querySelector<HTMLElement>(`[data-suffix="${key}"]`);
+        if (suffix) suffix.hidden = false;
+      }
+    }
+  };
+
+  let schedule: Scheduled[] = [];
+  const seen = new Set<string>();
+  let timer = 0;
+
+  const revealRow = (item: Scheduled) => {
+    if (!list || seen.has(item.id)) return;
+    seen.add(item.id);
+    emptyEl?.remove();
+    const li = document.createElement("li");
+    li.className = "flex items-baseline gap-3 py-2 border-t border-n-6 last:border-b min-w-0";
+    const tag = document.createElement("span");
+    tag.className = "shrink-0 text-n-4/70";
+    tag.textContent = "Δ24h";
+    const txt = document.createElement("span");
+    txt.className = "truncate text-n-3";
+    txt.textContent = item.text;
+    const who = document.createElement("span");
+    who.className = "ml-auto shrink-0 text-n-4";
+    who.textContent = "client";
+    li.append(tag, txt, who);
+    list.prepend(li);
+  };
+
+  const tick = () => {
+    const now = Date.now();
+    let next = Infinity;
+    for (const s of schedule) {
+      if (s.revealed) continue;
+      const wait = s.displayAt - now;
+      if (wait <= 0) {
+        s.revealed = true;
+        revealRow(s);
+      } else {
+        next = Math.min(next, wait);
+      }
+    }
+    if (next !== Infinity) {
+      clearTimeout(timer);
+      // Cap the wait so a far-future event still re-checks at least hourly.
+      timer = window.setTimeout(tick, Math.min(next, 3_600_000) + 50);
+    }
+  };
+
+  const load = async () => {
+    const url = feed?.dataset.replayUrl;
+    if (!url) return;
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) return;
+      const data = await response.json();
+      // Stale or malformed → hide the build-frozen digest, reveal nothing.
+      // NB: the client is intentionally STRICTER than the SSR freshness guard
+      // (which accepts a 2-day window so a weekly build still shows something).
+      // The client is authoritative at runtime: it only replays *yesterday's*
+      // artifact and suppresses any older digest the SSR optimistically
+      // rendered. Don't "harmonize" the two thresholds.
+      if (!Array.isArray(data?.events) || data.window !== yesterdaySgt()) {
+        setDigest(null);
+        return;
+      }
+      setDigest(typeof data.digest === "string" ? data.digest : null);
+      setTotals(data.totals && typeof data.totals === "object" ? data.totals : null);
+      schedule = data.events
+        .map((event: { at?: string; text?: string }, index: number) => {
+          const real = Date.parse(String(event.at));
+          return Number.isNaN(real)
+            ? null
+            : {
+                // Index-scoped so events sharing an `at` second don't collide.
+                id: `replay-${index}-${event.at}`,
+                text: String(event.text ?? "").slice(0, 80),
+                displayAt: real + DELAY_MS,
+                revealed: false,
+              };
+        })
+        .filter(Boolean) as Scheduled[];
+      tick();
+    } catch {
+      /* feed unreachable — SSR digest + totals stand */
+    }
+  };
+
+  if (feed && list) {
+    load();
+    // Re-sync when the tab returns to the foreground (a long-open tab crosses
+    // new reveal windows; a new day's artifact may have published).
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) load();
+    });
+  }
+</script>
