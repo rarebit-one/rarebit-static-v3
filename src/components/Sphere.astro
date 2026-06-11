@@ -1,0 +1,27 @@
+---
+// Globe hero graphic. The image is the Brainwave UI8 kit's own sphere
+// (templates/HomePage/Pricing → public/images/figures/4.png), copied verbatim
+// to public/images/figures/sphere.png — not a hand-drawn recreation. A soft
+// radial glow sits behind so it reads on the near-black section.
+interface Props {
+  class?: string;
+}
+const { class: className = "" } = Astro.props;
+---
+
+<div class={`relative aspect-square pointer-events-none ${className}`} aria-hidden="true">
+  <div
+    class="absolute inset-0 rounded-full opacity-70 blur-2xl"
+    style="background: radial-gradient(closest-side, rgba(177,76,255,0.35), rgba(0,232,255,0.12), transparent 75%);"
+  >
+  </div>
+  <img
+    class="relative w-full h-full object-contain"
+    src="/images/figures/sphere.png"
+    width="305"
+    height="305"
+    loading="eager"
+    decoding="async"
+    alt=""
+  />
+</div>
