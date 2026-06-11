@@ -4,12 +4,15 @@ import Layout from "../../layouts/Layout.astro";
 import Section from "../../components/Section.astro";
 import Heading from "../../components/Heading.astro";
 
-const notes = (await getCollection("notes")).sort(
+const notes = (await getCollection("fieldNotes")).sort(
   (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
 );
 
 const formatDate = (date: Date) =>
-  new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", year: "numeric" }).format(date);
+  new Intl.DateTimeFormat("en-SG", {
+    day: "numeric", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit", timeZone: "Asia/Singapore",
+  }).format(date);
 ---
 
 <Layout
@@ -29,7 +32,7 @@ const formatDate = (date: Date) =>
           {
             notes.map((note) => (
               <li class="reveal border-t border-n-6 last:border-b">
-                <a class="group block py-8" href={`/notes/${note.id}/`}>
+                <a class="group block py-8" href={`/field-notes/${note.id}/`}>
                   <div class="tagline mb-3 text-n-4">{formatDate(note.data.pubDate)}</div>
                   <h3 class="h5 mb-3 transition-colors group-hover:text-brand-magenta">
                     {note.data.title}

@@ -3,8 +3,8 @@ import { glob } from "astro/loaders";
 
 // Field notes — build logs from the farm. Agent-drafted, human-reviewed,
 // like everything else that ships here.
-const notes = defineCollection({
-  loader: glob({ pattern: "**/*.md", base: "./src/content/notes" }),
+const fieldNotes = defineCollection({
+  loader: glob({ pattern: "**/*.md", base: "./src/content/field-notes" }),
   schema: z.object({
     title: z.string(),
     description: z.string(),
@@ -12,4 +12,4 @@ const notes = defineCollection({
   }),
 });
 
-export const collections = { notes };
+export const collections = { fieldNotes };

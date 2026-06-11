@@ -11,4 +11,9 @@ export default defineConfig({
   vite: {
     plugins: [tailwindcss()],
   },
+  // Old /notes slug → /field-notes. Only already-published paths need an entry.
+  redirects: {
+    "/notes": "/field-notes/",
+    "/notes/this-site-was-built-by-the-farm": "/field-notes/this-site-was-built-by-the-farm/",
+  },
 });

@@ -2,7 +2,7 @@ import rss from "@astrojs/rss";
 import { getCollection } from "astro:content";
 
 export async function GET(context) {
-  const notes = await getCollection("notes");
+  const notes = await getCollection("fieldNotes");
   return rss({
     title: "Rarebit — Field notes",
     description:
@@ -14,7 +14,7 @@ export async function GET(context) {
         title: note.data.title,
         description: note.data.description,
         pubDate: note.data.pubDate,
-        link: `/notes/${note.id}/`,
+        link: `/field-notes/${note.id}/`,
       })),
     customData: `<language>en</language>`,
   });

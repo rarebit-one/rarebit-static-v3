@@ -1,7 +1,7 @@
 ---
 title: "This site was built by the farm (humans merged)"
 description: "Six pull requests, agent-written code, human-approved merges — the build log of rarebit.one, which is also a demo of the service."
-pubDate: 2026-06-08
+pubDate: 2026-06-08T09:00:00+08:00
 ---
 
 The site you're reading was built the way we build everything: agents do the
