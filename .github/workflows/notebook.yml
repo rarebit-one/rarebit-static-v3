@@ -19,7 +19,7 @@ name: Notebook
 #
 # Missing any secret → the relevant step no-ops (exit 0) and no issue is
 # created, so the workflow stays green until both are wired up:
-#   FEED_GITHUB_PAT · ANTHROPIC_API_KEY
+#   FEED_GITHUB_PAT · OPENAI_API_KEY
 # (publish uses the built-in GITHUB_TOKEN — no extra secret needed.)
 
 on:
@@ -41,7 +41,8 @@ jobs:
     timeout-minutes: 10
     env:
       FEED_GITHUB_PAT: ${{ secrets.FEED_GITHUB_PAT }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
     steps:
       - uses: actions/checkout@v4
 
@@ -62,7 +63,7 @@ jobs:
             exit 0
           fi
           if [ ! -f seeds.json ]; then
-            echo "seeds.json absent (curate no-op'd — no ANTHROPIC_API_KEY) — skipping."
+            echo "seeds.json absent (curate no-op'd — no OPENAI_API_KEY) — skipping."
             exit 0
           fi
           node scripts/notebook/validate.mjs notebook-raw.json seeds.json validated-seeds.json

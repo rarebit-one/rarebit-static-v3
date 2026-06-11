@@ -5,7 +5,8 @@ name: Site freshness
 # AUTO-LAND PR with the bounded fix:
 #   gather (read the worktree — workflow filenames as capability signals, the
 #     page inventory, the checkable static claims in src/data/site.ts, and every
-#     field note with its FULL body) → draft (one claude-opus-4-8 call: propose a
+#     field note with its FULL body) → draft (one OpenAI chat-completions call,
+#     model = OPENAI_MODEL repo var, default gpt-4o: propose a
 #     small, bounded patch — copyEdits for stale static copy, and APPEND-ONLY
 #     addenda for drifted field notes) → validate (the gate: applies the patch
 #     ONLY if every check passes, and ENFORCES that a field note's original prose
@@ -20,7 +21,7 @@ name: Site freshness
 # Missing any secret → the relevant step no-ops (exit 0) and no PR is opened, so
 # the workflow stays green until all are wired up:
 #   FEED_GITHUB_PAT (optional — local reads work without it; only live facts use
-#     it) · ANTHROPIC_API_KEY (draft) · AUTOLAND_PAT (open the PR as a bot that
+#     it) · OPENAI_API_KEY (draft) · AUTOLAND_PAT (open the PR as a bot that
 #     can trigger downstream checks)
 
 on:
@@ -43,7 +44,8 @@ jobs:
     timeout-minutes: 10
     env:
       FEED_GITHUB_PAT: ${{ secrets.FEED_GITHUB_PAT }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
     steps:
       - uses: actions/checkout@v4
         with:

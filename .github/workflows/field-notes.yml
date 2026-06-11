@@ -2,8 +2,9 @@ name: Field notes
 
 # Weekly auto-publishing Field Note (Mon 06:00 SGT / Sun 22:00 UTC):
 # gather (last 7 days — public PRs/releases in full detail; private work
-# reduced to anonymized category counts inside the script) → draft (one
-# claude-opus-4-8 call, grounded only in those facts) → validate (the SOLE
+# reduced to anonymized category counts inside the script) → draft (one OpenAI
+# chat-completions call, model = OPENAI_MODEL repo var, default gpt-4o, grounded
+# only in those facts) → validate (the SOLE
 # pre-publish gate: hard-fails on any private blocklist identifier,
 # off-allowlist URL, email/@handle, or dead internal link; no-ops a thin
 # week) → auto-commit the markdown to main. There is NO human review between
@@ -12,7 +13,7 @@ name: Field notes
 #
 # Missing any secret → the relevant step no-ops (exit 0) and nothing is
 # committed, so the workflow stays green until both are wired up:
-#   FEED_GITHUB_PAT · ANTHROPIC_API_KEY
+#   FEED_GITHUB_PAT · OPENAI_API_KEY
 #
 # NB: pushing the commit directly to main requires that branch protection
 # permits the github-actions bot to push. If main is protected against direct
@@ -38,7 +39,8 @@ jobs:
     timeout-minutes: 10
     env:
       FEED_GITHUB_PAT: ${{ secrets.FEED_GITHUB_PAT }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4

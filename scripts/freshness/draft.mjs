@@ -10,9 +10,9 @@
 // the gate: it re-derives every change deterministically, enforces the
 // byte-for-byte preservation of original note prose, and only then writes.
 //
-// One Anthropic API call per run (claude-opus-4-8). Missing ANTHROPIC_API_KEY
-// → exit 0 with a notice. Missing/empty state.json → exit 0. Both keep the
-// workflow green until secrets are wired up.
+// One OpenAI chat-completions call per run; model = OPENAI_MODEL repo var
+// (default gpt-4o). Missing OPENAI_API_KEY → exit 0 with a notice. Missing/empty
+// state.json → exit 0. Both keep the workflow green until secrets are wired up.
 //
 // Input:  argv[2] (default ./state.json)
 // Output: argv[3] (default ./patch.json)
@@ -20,17 +20,17 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { voiceHeader } from "../lib/voice.mjs";
+import { callLLM, hasOpenAIKey } from "../lib/llm.mjs";
 
 const IN = process.argv[2] ?? "state.json";
 const OUT = process.argv[3] ?? "patch.json";
-const KEY = process.env.ANTHROPIC_API_KEY;
 
 function noop(reason) {
   console.log(`draft: ${reason} — skipping (graceful no-op).`);
   process.exit(0);
 }
 
-if (!KEY) noop("ANTHROPIC_API_KEY not set");
+if (!hasOpenAIKey()) noop("OPENAI_API_KEY not set");
 if (!existsSync(IN)) noop(`${IN} absent (gather skipped)`);
 
 const state = JSON.parse(readFileSync(IN, "utf8"));
@@ -69,28 +69,13 @@ Review it for genuine drift between the published copy and the farm's actual cur
 
 Both arrays MAY be empty — propose nothing if nothing is genuinely stale. Do not include any other keys.`;
 
-const response = await fetch("https://api.anthropic.com/v1/messages", {
-  method: "POST",
-  headers: {
-    "x-api-key": KEY,
-    "anthropic-version": "2023-06-01",
-    "content-type": "application/json",
-  },
-  body: JSON.stringify({
-    model: "claude-opus-4-8",
-    max_tokens: 2048,
-    system,
-    messages: [{ role: "user", content: prompt }],
-  }),
-});
-
-if (!response.ok) {
-  console.error(`draft: Anthropic API ${response.status} — ${await response.text()}`);
+let text;
+try {
+  text = await callLLM({ system, prompt, maxTokens: 2048, json: true });
+} catch (err) {
+  console.error(`draft: ${err.message}`);
   process.exit(1);
 }
-
-const data = await response.json();
-const text = (data.content ?? []).filter((b) => b.type === "text").map((b) => b.text).join("");
 
 // The model is asked for bare JSON; tolerate accidental fencing.
 const jsonStr = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();

@@ -11,7 +11,7 @@ name: Farm feed
 #
 # Missing any secret → the relevant step no-ops (exit 0) and publish is
 # skipped, so the workflow stays green until all four are wired up:
-#   FEED_GITHUB_PAT · ANTHROPIC_API_KEY · SPACES_KEY_ID · SPACES_SECRET
+#   FEED_GITHUB_PAT · OPENAI_API_KEY · SPACES_KEY_ID · SPACES_SECRET
 
 on:
   schedule:
@@ -31,7 +31,8 @@ jobs:
     timeout-minutes: 10
     env:
       FEED_GITHUB_PAT: ${{ secrets.FEED_GITHUB_PAT }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
       SPACES_KEY_ID: ${{ secrets.SPACES_KEY_ID }}
       SPACES_SECRET: ${{ secrets.SPACES_SECRET }}
       BUCKET: rarebit-farm-feed
