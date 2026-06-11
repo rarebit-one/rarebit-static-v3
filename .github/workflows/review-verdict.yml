@@ -1,0 +1,72 @@
+name: Review verdict
+
+# Binding, repo-local review gate for gated auto-land (issue #29).
+#
+# The existing Claude Code Review workflow (claude-code-review.yml) only POSTS
+# human-readable comments and lives in the rarebit-one/.github org repo, so it
+# cannot be a reliable, controllable merge gate. THIS workflow is self-contained
+# and fully owned here: it sends the PR diff to the OpenAI API (via the shared
+# scripts/lib/llm.mjs helper) with a strict rubric and records the verdict as a
+# commit status named `review/clear` on the PR head SHA. That status is one of
+# the required contexts for branch protection (see scripts/autoland/enable.sh)
+# and is consumed by auto-land.yml.
+#
+# Fail CLOSED: any error (missing key, API failure, unparseable response) sets
+# the status to `failure`, never `success`. The gate must never green on a
+# broken gate. Re-runs on every push (synchronize), so the loop
+# "address findings → push → re-evaluate → clears" works naturally.
+#
+# claude-code-review.yml is intentionally left UNTOUCHED — it stays as
+# informal commentary; this is the binding signal.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  statuses: write
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: review-verdict-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verdict:
+    name: Review verdict
+    # Fork PRs don't receive secrets, so the gate would always fail closed and
+    # waste runner minutes — skip them outright. (Fail-closed still holds: a
+    # fork PR simply never gets a `review/clear` success, so it cannot
+    # auto-land.)
+    if: github.event.pull_request.head.repo.fork == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      OWNER: ${{ github.repository_owner }}
+      REPO: ${{ github.event.repository.name }}
+      SHA: ${{ github.event.pull_request.head.sha }}
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mark status pending
+        run: |
+          gh api -X POST "/repos/$OWNER/$REPO/statuses/$SHA" \
+            -f state=pending \
+            -f context='review/clear' \
+            -f description='Reviewing diff against the repo rubric…' >/dev/null
+
+      - name: Fetch PR diff
+        run: |
+          gh pr diff "$PR" --repo "$OWNER/$REPO" > pr.diff || {
+            echo "Could not fetch PR diff" >&2
+            exit 1
+          }
+          echo "Diff size: $(wc -c < pr.diff) bytes"
+
+      - name: Evaluate verdict and set status
+        run: node .github/scripts/review-verdict.mjs

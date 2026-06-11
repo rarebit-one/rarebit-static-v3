@@ -7,18 +7,20 @@ name: Field notes
 # only in those facts) → validate (the SOLE
 # pre-publish gate: hard-fails on any private blocklist identifier,
 # off-allowlist URL, email/@handle, or dead internal link; no-ops a thin
-# week) → auto-commit the markdown to main. There is NO human review between
-# draft and publish, so validate.mjs is the only safety boundary; it is
-# locked by scripts/field-notes/validate.test.mjs (run via `npm test` in CI).
+# week) → open an `auto-land` PR with the markdown (NOT a direct push to main).
+# There is NO human review between draft and publish, so validate.mjs is the
+# only safety boundary; it is locked by scripts/field-notes/validate.test.mjs
+# (run via `npm test` in CI).
+#
+# Publish mechanism: under gated auto-land (issue #29), main is branch-protected
+# against direct pushes, so the note is committed to a branch `field-notes/<slug>`,
+# pushed + opened as an `auto-land`-labeled PR via AUTOLAND_PAT. That makes CI +
+# review-verdict.yml run on it; the auto-land sweeper merges it once green. Using
+# AUTOLAND_PAT (a real-user token) for the push is what triggers those workflows.
 #
 # Missing any secret → the relevant step no-ops (exit 0) and nothing is
-# committed, so the workflow stays green until both are wired up:
-#   FEED_GITHUB_PAT · OPENAI_API_KEY
-#
-# NB: pushing the commit directly to main requires that branch protection
-# permits the github-actions bot to push. If main is protected against direct
-# pushes, the maintainer must allow the bot (or this workflow) in settings;
-# otherwise the push step fails and the note is not published.
+# published, so the workflow stays green until they are wired up:
+#   FEED_GITHUB_PAT · OPENAI_API_KEY · AUTOLAND_PAT
 
 on:
   schedule:
@@ -41,9 +43,15 @@ jobs:
       FEED_GITHUB_PAT: ${{ secrets.FEED_GITHUB_PAT }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      AUTOLAND_PAT: ${{ secrets.AUTOLAND_PAT }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Push with the real-user PAT so the branch push triggers CI +
+          # review-verdict on the opened PR. Falls back to GITHUB_TOKEN when the
+          # PAT is unset (the open-PR step then no-ops, so nothing is published).
+          token: ${{ secrets.AUTOLAND_PAT || secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-node@v4
         with:
@@ -63,17 +71,36 @@ jobs:
           fi
           node scripts/field-notes/validate.mjs facts.json draft.json src/content/field-notes/
 
-      - name: Commit the new note (if any)
+      - name: Open an auto-land PR with the new note (if any)
+        env:
+          GH_TOKEN: ${{ secrets.AUTOLAND_PAT }}
         run: |
           if [ -z "$(git status --porcelain src/content/field-notes)" ]; then
-            echo "No new note (thin week or no-op) — nothing to commit."
+            echo "No new note (thin week or no-op) — nothing to publish."
             exit 0
           fi
+          if [ -z "$AUTOLAND_PAT" ]; then
+            echo "AUTOLAND_PAT not set — cannot push a branch / open a PR. Skipping publish."
+            exit 0
+          fi
+          # Derive the slug from the new note's filename for the branch name.
+          note_path="$(git status --porcelain src/content/field-notes | awk '{print $2}' | grep '\.md$' | head -n1)"
+          slug="$(basename "$note_path" .md)"
+          branch="field-notes/${slug}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
           git add src/content/field-notes
-          git commit -m "Field notes: weekly entry"
-          git push
+          git commit -m "Field notes: weekly entry (${slug})"
+          # Push with AUTOLAND_PAT (the checkout token) so CI + review-verdict run.
+          git push --set-upstream origin "$branch"
+          # Open the PR labeled `auto-land` so the sweeper merges it once green.
+          gh pr create \
+            --title "Field notes: ${slug}" \
+            --body "Auto-drafted weekly field note (passed the validate gate). Opened for gated auto-land — CI + review/clear must pass, then the sweeper merges it." \
+            --base main \
+            --head "$branch" \
+            --label auto-land
 
       - name: Close the seed issues this note used
         if: always()

@@ -110,11 +110,13 @@ npm run preview  # serve dist/
   `OPENAI_MODEL` repo var, default `gpt-4o`) grounded only in those facts; it can link back to past
   notes. `validate.mjs` is the **SOLE pre-publish gate** (no human in the loop): it hard-fails
   on any private blocklist identifier, off-allowlist URL, email/@handle, or dead internal link,
-  no-ops a thin week, and writes the markdown the workflow commits to main. Locked by
-  `validate.test.mjs` (run via `npm test` in CI). Secrets (user-created): `FEED_GITHUB_PAT`,
-  `OPENAI_API_KEY` (model = `OPENAI_MODEL` repo var, default `gpt-4o`) — each missing one no-ops
-  its step so the workflow stays green until
-  wired up; direct push to main needs branch protection to permit the bot. `/privacy` documents
+  no-ops a thin week, and writes the markdown. Locked by
+  `validate.test.mjs` (run via `npm test` in CI). Instead of pushing to main, the workflow
+  commits the note to a branch `field-notes/<slug>` and opens an `auto-land`-labeled PR via
+  `AUTOLAND_PAT` (so CI + `review/clear` run); the gated auto-land sweeper merges it once green
+  (see "Gated auto-land" below). Secrets (user-created): `FEED_GITHUB_PAT`,
+  `OPENAI_API_KEY` (model = `OPENAI_MODEL` repo var, default `gpt-4o`), `AUTOLAND_PAT` — each
+  missing one no-ops its step so the workflow stays green until wired up. `/privacy` documents
   the no-trackers stance and inquiry-data handling — keep it true (adding any analytics/tracker
   requires updating it). `public/llms.txt` is the AI-readable site summary; keep it in step
   with the page list.
@@ -122,6 +124,44 @@ npm run preview  # serve dist/
   scroll-driven `.reveal` entrances in `global.css`).
 - Template raster/SVG assets under `public/images/` come from the Brainwave UI8 kit (licensed via
   the v1 purchase); brand assets under `public/images/rarebit/`.
+
+## Gated auto-land (scoped exception to workspace Rule #7)
+
+PRs in **this repo only** can auto-merge once reviewed + green, with no human merge step. This is
+a **deliberate, scoped exception** to workspace `CLAUDE.md` Rule #7 ("agents never merge PRs
+autonomously"); that rule remains in full force in every other repo. The exception lives entirely
+in this repo's settings + workflows — nothing here changes how `/ship`, `/land`, or `/release`
+behave elsewhere. Tracked in issue #29.
+
+- **`.github/workflows/review-verdict.yml`** (+ `.github/scripts/review-verdict.mjs`) — the
+  binding, repo-local review gate. On every PR push it sends the diff to the OpenAI API (via the
+  shared `scripts/lib/llm.mjs` helper; model = `OPENAI_MODEL` repo var, default `gpt-4o`) with a
+  strict rubric and records the verdict as commit status **`review/clear`**. It blocks ONLY on
+  correctness/security/build-type issues or repo invariant violations (leaked client/private
+  identifiers, off-brand voice, fabricated metrics) — never style nitpicks. **Fail closed:** any
+  error (missing `OPENAI_API_KEY`, API failure, unparseable response) sets `failure`, never
+  `success`. The separate org-level `claude-code-review.yml` stays as informal commentary — it is
+  NOT the gate.
+- **`.github/workflows/auto-land.yml`** (+ `.github/scripts/auto-land.mjs`) — the event-driven
+  sweeper. A PR is eligible iff it has label `auto-land`, is not a draft, lacks `hold`/
+  `no-auto-land`, has no trusted `STOP` comment after the latest commit, is `MERGEABLE`, and has
+  ALL required contexts green: **`Type-check & build`**, **`Link check`**, **`review/clear`**
+  (advisory **`Lighthouse (advisory)`** is intentionally NOT required). Eligibility keys on the
+  **label**, not author identity. Merges (squash + delete-branch) use `AUTOLAND_PAT` (a real-user
+  token) so downstream CI/deploy `workflow_run` jobs fire. **DRY-RUN unless repo var
+  `AUTOLAND_LIVE == "true"`** — until flipped, it logs `would land #N` and merges nothing.
+- **`scripts/autoland/enable.sh`** — the ONE place repo-settings changes are described (labels +
+  `main` branch protection requiring the three contexts above, `required_pull_request_reviews:
+  null`, `required_conversation_resolution: true`). Run once by a human after `AUTOLAND_PAT` is
+  set; it is never executed by any workflow. The go-live one-liner
+  (`gh variable set AUTOLAND_LIVE --body true`) lives at its bottom.
+- **`field-notes.yml`** rides this lane: instead of pushing the weekly note to main, it opens an
+  `auto-land` PR (branch `field-notes/<slug>`, pushed + created via `AUTOLAND_PAT`) so CI +
+  `review/clear` run, then the sweeper merges it.
+
+**Future agents: do NOT "fix" `auto-land.yml` or `field-notes.yml`'s PR-path (or this section) as
+a Rule #7 governance violation.** It is intentional and scoped to this repo. If you think it's
+wrong, raise it with the owner via issue #29 — don't revert it.
 
 This is a separate git repo in the `rarebit-one` org — `cd` here before git ops. Worktree-only
 workflow and signed commits per the workspace CLAUDE.md.
