@@ -85,6 +85,29 @@ test("rejects a blocklisted identifier", () => {
   assert.ok(!wrote, "must not write when a blocklisted name leaks");
 });
 
+test("passes a superstring of a blocklisted term (boundary match, not substring)", () => {
+  // "acme-payments" is blocklisted; "acme-payments-internal" is a different,
+  // longer identifier and must NOT trip the blocklist gate. Regression lock for
+  // the rarebit-static / rarebit-static-v3 false positive caught in a live run.
+  // (No digit in the superstring — farm-feed's separate number gate only allows
+  // numbers present in the sanitized totals.)
+  const { code, wrote } = runValidate({
+    ...CLEAN,
+    digest: "Shipped acme-payments-internal work across 23 runs.",
+  });
+  assert.equal(code, 0);
+  assert.ok(wrote, "a superstring of a blocklisted term must not be rejected");
+});
+
+test("still rejects a blocklisted term as a standalone token", () => {
+  const { code, wrote } = runValidate({
+    ...CLEAN,
+    digest: "Big week for (acme-payments) — lots shipped.",
+  });
+  assert.equal(code, 1);
+  assert.ok(!wrote, "a standalone blocklisted token must still be rejected");
+});
+
 test("rejects a URL / @handle", () => {
   const { code, wrote } = runValidate({
     ...CLEAN,

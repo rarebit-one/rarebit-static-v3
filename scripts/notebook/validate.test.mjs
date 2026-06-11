@@ -82,6 +82,25 @@ test("rejects a blocklisted identifier in a seed angle", () => {
   assert.ok(!wrote, "must not write when a blocklisted name leaks");
 });
 
+test("passes a superstring of a blocklisted term (boundary match, not substring)", () => {
+  // "acme-payments" is blocklisted; "acme-payments-v2" is a different, longer
+  // identifier and must NOT trip the gate. This is the regression lock for the
+  // rarebit-static / rarebit-static-v3 false positive caught in a live run.
+  const { code, wrote } = runValidate({
+    seeds: [{ angle: "A quiet week shipping acme-payments-v2 internals", grounding: [] }],
+  });
+  assert.equal(code, 0);
+  assert.ok(wrote, "a superstring of a blocklisted term must not be rejected");
+});
+
+test("still rejects a blocklisted term as a standalone token", () => {
+  const { code, wrote } = runValidate({
+    seeds: [{ angle: "A quiet week for (acme-payments) and friends.", grounding: [] }],
+  });
+  assert.equal(code, 1);
+  assert.ok(!wrote, "a standalone blocklisted token must still be rejected");
+});
+
 test("rejects an off-allowlist URL in grounding", () => {
   const { code, wrote } = runValidate({
     seeds: [{ angle: "Details elsewhere", grounding: ["https://evil.example.com/leak"] }],
