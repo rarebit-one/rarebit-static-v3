@@ -95,12 +95,26 @@ npm run preview  # serve dist/
   (`doctl apps spec get`) instead; see the warning header in `.do/app.yaml`.
 - **Shared SVG gradient defs** (`#btn-*`, `#brackets-*`) live once in `Layout.astro`; Button and
   Tagline reference them by id. The Benefits clip-path (`#benefits`) lives in `Benefits.astro`.
-- **Field notes** (`/notes`) are an Astro content collection (`src/content/notes/*.md`,
-  schema in `src/content.config.ts`) with RSS at `/rss.xml`. Posts are agent-drafted,
-  human-reviewed; only verifiable claims (public PRs, real data) — never invent metrics.
-  `/privacy` documents the no-trackers stance and inquiry-data handling — keep it true (adding
-  any analytics/tracker requires updating it). `public/llms.txt` is the AI-readable site
-  summary; keep it in step with the page list.
+- **Field notes** (`/field-notes`) are an Astro content collection
+  (`src/content/field-notes/*.md`, schema in `src/content.config.ts`) with RSS at `/rss.xml`;
+  the old `/notes` paths redirect (an in-flight PR handles the rename + redirects). Only
+  verifiable claims (public PRs, real data) — never invent metrics. Weekly entries are
+  **agent-drafted and auto-published** behind the validation gate (below); manually authored
+  notes remain human-reviewed. A weekly pipeline (`scripts/field-notes/`, `field-notes.yml`,
+  Mon 06:00 SGT) auto-drafts and AUTO-PUBLISHES a note, mirroring farm-feed's
+  gather→draft→validate sandwich: `gather.mjs` collects the last 7 days — PUBLIC repo
+  PRs/releases in full, linkable detail; PRIVATE work reduced to anonymized category counts
+  **inside the script** (names/logins never leave it, only the `blocklist`). `draft.mjs` makes
+  the one LLM call (`claude-opus-4-8`) grounded only in those facts; it can link back to past
+  notes. `validate.mjs` is the **SOLE pre-publish gate** (no human in the loop): it hard-fails
+  on any private blocklist identifier, off-allowlist URL, email/@handle, or dead internal link,
+  no-ops a thin week, and writes the markdown the workflow commits to main. Locked by
+  `validate.test.mjs` (run via `npm test` in CI). Secrets (user-created): `FEED_GITHUB_PAT`,
+  `ANTHROPIC_API_KEY` — each missing one no-ops its step so the workflow stays green until
+  wired up; direct push to main needs branch protection to permit the bot. `/privacy` documents
+  the no-trackers stance and inquiry-data handling — keep it true (adding any analytics/tracker
+  requires updating it). `public/llms.txt` is the AI-readable site summary; keep it in step
+  with the page list.
 - **Motion is CSS-only** and gated behind `prefers-reduced-motion` (orb floats, caret blink,
   scroll-driven `.reveal` entrances in `global.css`).
 - Template raster/SVG assets under `public/images/` come from the Brainwave UI8 kit (licensed via
