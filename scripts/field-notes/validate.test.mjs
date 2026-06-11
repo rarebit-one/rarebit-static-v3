@@ -85,6 +85,57 @@ test("rejects a blocklisted identifier in the body", () => {
   assert.ok(!wrote, "must not write when a blocklisted name leaks");
 });
 
+test("passes a superstring of a blocklisted term (boundary match, not substring)", () => {
+  // "acme-payments" is blocklisted; "acme-payments-v2" is a different, longer
+  // identifier and must NOT trip the gate. Regression lock for the
+  // rarebit-static / rarebit-static-v3 false positive caught in a live run.
+  const { code, wrote } = runValidate({
+    ...CLEAN,
+    body: CLEAN.body + "\n\nA quiet week shipping acme-payments-v2 internals.",
+  });
+  assert.equal(code, 0);
+  assert.ok(wrote, "a superstring of a blocklisted term must not be rejected");
+});
+
+test("still rejects a blocklisted term as a standalone token", () => {
+  const { code, wrote } = runValidate({
+    ...CLEAN,
+    body: CLEAN.body + "\n\nBig week for (acme-payments) and friends.",
+  });
+  assert.equal(code, 1);
+  assert.ok(!wrote, "a standalone blocklisted token must still be rejected");
+});
+
+test("rejects an @handle that follows punctuation", () => {
+  // The tightened regex catches ",@user" / "/@user" the old [\s(] class missed.
+  const { code, wrote } = runValidate({
+    ...CLEAN,
+    body: CLEAN.body + "\n\nThanks,@someone for the help.",
+  });
+  assert.equal(code, 1);
+  assert.ok(!wrote, "an @handle after punctuation must be rejected");
+});
+
+test("rejects a look-alike URL host (boundary-anchored allowlist)", () => {
+  // https://rarebit.one is allowlisted; a bare startsWith() would wrongly wave
+  // through rarebit.one.evil.com — the boundary check must reject it.
+  const { code, wrote } = runValidate({
+    ...CLEAN,
+    body: CLEAN.body + "\n\nMore at https://rarebit.one.evil.com/x for details.",
+  });
+  assert.equal(code, 1);
+  assert.ok(!wrote, "a look-alike URL host must be rejected");
+});
+
+test("still passes a legitimately allowed URL (rarebit.one with a path)", () => {
+  const { code, wrote } = runValidate({
+    ...CLEAN,
+    body: CLEAN.body + "\n\nOur front door: https://rarebit.one/connect.",
+  });
+  assert.equal(code, 0);
+  assert.ok(wrote, "an allowlisted URL with a path must still pass");
+});
+
 test("rejects an off-allowlist URL", () => {
   const { code, wrote } = runValidate({
     ...CLEAN,

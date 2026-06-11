@@ -36,6 +36,23 @@ const fail = (reason) => {
   process.exit(1);
 };
 
+// Match a blocklisted identifier only as a whole token — not as a substring of a
+// longer identifier. Without this, the PRIVATE repo "rarebit-static" matches inside
+// the PUBLIC "rarebit-static-v3" this site is about (a guaranteed false positive).
+function containsIdentifier(haystackLower, termLower) {
+  const idChar = /[a-z0-9_-]/; // chars that continue a repo/login identifier
+  for (let from = 0; ; ) {
+    const i = haystackLower.indexOf(termLower, from);
+    if (i === -1) return false;
+    const before = i > 0 ? haystackLower[i - 1] : "";
+    const after = i + termLower.length < haystackLower.length ? haystackLower[i + termLower.length] : "";
+    const boundedLeft = !before || !idChar.test(before);
+    const boundedRight = !after || !idChar.test(after);
+    if (boundedLeft && boundedRight) return true;
+    from = i + 1;
+  }
+}
+
 // --- THIN-WEEK NO-OP (not a failure) ---------------------------------------
 // If there's nothing worth a note, exit 0 without writing — mirrors farm-feed's
 // empty-day handling. We never force filler ("never invent metrics").
@@ -63,7 +80,7 @@ const blobLower = blob.toLowerCase();
 // Guard trivially short terms (a 2-char repo name would false-positive).
 for (const term of facts.private?.blocklist ?? []) {
   const t = String(term).toLowerCase().trim();
-  if (t.length >= 3 && blobLower.includes(t)) {
+  if (t.length >= 3 && containsIdentifier(blobLower, t)) {
     fail(`output contains blocklisted identifier "${term}"`);
   }
 }
@@ -71,7 +88,10 @@ for (const term of facts.private?.blocklist ?? []) {
 // --- 3. EMAIL / @handle — none belong in a public note ----------------------
 // (Checked before URLs so an email isn't mistaken for a bare token.)
 if (/[\w.+-]+@[\w-]+\.[\w.-]+/.test(blob)) fail("output contains an email address");
-if (/(^|[\s(])@\w/.test(blob)) fail("output contains an @handle");
+// @handle in ANY non-word position — start, or after whitespace/punctuation
+// (",@user", "/@user", "[@user"). A bare [\s(] class missed those. Emails are
+// caught above; "." before @ is excluded so this doesn't double-flag them.
+if (/(^|[^\w.])@\w/.test(blob)) fail("output contains an @handle");
 
 // --- 2. URL ALLOWLIST — every URL must trace to the facts -------------------
 const allowedPrefixes = new Set(["https://rarebit.one"]);
@@ -80,10 +100,18 @@ for (const rel of releases) if (rel.url) allowedPrefixes.add(rel.url);
 for (const repo of facts.public?.repos ?? []) {
   allowedPrefixes.add(`https://github.com/rarebit-one/${repo}`);
 }
+// A URL matches a prefix only at a real boundary — exact match, or the next
+// char is a path/query/fragment separator. This rejects look-alikes like
+// "https://rarebit.one.evil.com" that a bare startsWith() would wave through.
+const matchesPrefix = (url, prefix) => {
+  if (!url.startsWith(prefix)) return false;
+  if (url.length === prefix.length) return true;
+  return ["/", "?", "#"].includes(url[prefix.length]);
+};
 const urls = blob.match(/https?:\/\/[^\s)\]<>"']+/gi) ?? [];
 for (const rawUrl of urls) {
   const url = rawUrl.replace(/[.,;:]+$/, ""); // trailing punctuation isn't part of the URL
-  const ok = [...allowedPrefixes].some((prefix) => url.startsWith(prefix));
+  const ok = [...allowedPrefixes].some((prefix) => matchesPrefix(url, prefix));
   if (!ok) fail(`output contains off-allowlist URL "${url}"`);
 }
 

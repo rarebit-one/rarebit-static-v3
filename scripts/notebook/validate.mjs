@@ -36,6 +36,23 @@ const fail = (reason) => {
   process.exit(1);
 };
 
+// Match a blocklisted identifier only as a whole token — not as a substring of a
+// longer identifier. Without this, the PRIVATE repo "rarebit-static" matches inside
+// the PUBLIC "rarebit-static-v3" this site is about (a guaranteed false positive).
+function containsIdentifier(haystackLower, termLower) {
+  const idChar = /[a-z0-9_-]/; // chars that continue a repo/login identifier
+  for (let from = 0; ; ) {
+    const i = haystackLower.indexOf(termLower, from);
+    if (i === -1) return false;
+    const before = i > 0 ? haystackLower[i - 1] : "";
+    const after = i + termLower.length < haystackLower.length ? haystackLower[i + termLower.length] : "";
+    const boundedLeft = !before || !idChar.test(before);
+    const boundedRight = !after || !idChar.test(after);
+    if (boundedLeft && boundedRight) return true;
+    from = i + 1;
+  }
+}
+
 const raw = JSON.parse(readFileSync(RAW, "utf8"));
 const curated = existsSync(SEEDS) ? JSON.parse(readFileSync(SEEDS, "utf8")) : { seeds: [] };
 
@@ -60,7 +77,7 @@ const blobLower = blob.toLowerCase();
 //    terms (a 2-char repo name would false-positive). >= 3 chars, like siblings.
 for (const term of raw.blocklist ?? []) {
   const t = String(term).toLowerCase().trim();
-  if (t.length >= 3 && blobLower.includes(t)) {
+  if (t.length >= 3 && containsIdentifier(blobLower, t)) {
     fail(`seed contains blocklisted identifier "${term}"`);
   }
 }
