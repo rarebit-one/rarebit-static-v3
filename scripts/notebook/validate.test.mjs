@@ -1,15 +1,16 @@
 // Tests for the notebook safety gate (validate.mjs). Because the daily workflow
-// writes the merged notebook straight back to the (private) bucket with NO
-// human review between curate and publish, this gate is the only thing standing
-// between an LLM's idea-seeds and the notebook the weekly field note later
-// mines. A regression here could persist a client identifier or an off-facts
-// link that then surfaces in a published note. The invariant is locked here:
-// REJECT (exit 1, nothing written) on any blocklisted identifier, email/@handle,
-// or off-allowlist URL; PASS (exit 0, notebook written) on clean seeds — and on
-// pass, MERGE with the existing notebook and DROP seeds older than 14 days.
+// turns these seeds straight into PUBLIC GitHub issues with NO human review
+// between curate and publish, this gate is the only thing standing between an
+// LLM's idea-seeds and a public issue (which a future weekly field note may
+// then mine). A regression here could surface a client identifier or an
+// off-facts link in a public issue. The invariant is locked here: REJECT
+// (exit 1, nothing written) on any blocklisted identifier, email/@handle, or
+// off-allowlist URL; PASS (exit 0, validated-seeds.json written with the
+// passing seeds) on clean seeds.
 //
 // Runs the real script as a subprocess against fixtures/notebook-raw.json, so it
-// exercises the actual CLI path the daily workflow uses.
+// exercises the actual CLI path the daily workflow uses. validate.mjs is now
+// pure (no network, no merge) — it only screens and emits the seeds.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -23,32 +24,21 @@ const here = dirname(fileURLToPath(import.meta.url));
 const VALIDATE = join(here, "validate.mjs");
 const RAW = join(here, "fixtures", "notebook-raw.json");
 
-// Run validate.mjs with curated seeds and (optionally) an existing notebook,
-// writing into a temp dir so nothing real is touched. The fixture's blocklist
-// includes "acme-payments" and "octocat"; its public URLs cover PR #40 on
-// rarebit-static-v3, a standard_ledger release, and a standard_id commit.
-function runValidate(seeds, existingNotebook) {
+// Run validate.mjs with curated seeds, writing into a temp dir so nothing real
+// is touched. The fixture's blocklist includes "acme-payments" and "octocat";
+// its public URLs cover PR #40 on rarebit-static-v3, a standard_ledger release,
+// and a standard_id commit.
+function runValidate(seeds) {
   const dir = mkdtempSync(join(tmpdir(), "notebook-"));
   const seedsPath = join(dir, "seeds.json");
-  const outPath = join(dir, "notebook.json");
+  const outPath = join(dir, "validated-seeds.json");
   writeFileSync(seedsPath, JSON.stringify(seeds));
-  let existingPath = join(dir, "no-existing.json"); // a path that does not exist
-  if (existingNotebook) {
-    existingPath = join(dir, "existing.json");
-    writeFileSync(existingPath, JSON.stringify(existingNotebook));
-  }
-  const res = spawnSync("node", [VALIDATE, RAW, seedsPath, existingPath, outPath], { encoding: "utf8" });
+  const res = spawnSync("node", [VALIDATE, RAW, seedsPath, outPath], { encoding: "utf8" });
   const wrote = existsSync(outPath);
-  const notebook = wrote ? JSON.parse(readFileSync(outPath, "utf8")) : null;
+  const validated = wrote ? JSON.parse(readFileSync(outPath, "utf8")) : null;
   rmSync(dir, { recursive: true, force: true });
-  return { code: res.status, stderr: res.stderr, wrote, notebook };
+  return { code: res.status, stderr: res.stderr, wrote, validated };
 }
-
-const sgtIso = (msAgo) => {
-  const d = new Date(Date.now() - msAgo + 8 * 3600_000);
-  return `${d.toISOString().slice(0, 19)}+08:00`;
-};
-const DAY = 24 * 3600_000;
 
 // Clean seeds: angles grounded only in allowlisted public URLs + one purely
 // generic private observation (empty grounding).
@@ -69,34 +59,19 @@ const CLEAN = {
   ],
 };
 
-test("passes clean seeds and writes the notebook", () => {
-  const { code, wrote, notebook } = runValidate(CLEAN);
+test("passes clean seeds and writes validated-seeds.json with the seeds", () => {
+  const { code, wrote, validated } = runValidate(CLEAN);
   assert.equal(code, 0);
-  assert.ok(wrote, "expected the notebook to be written on pass");
-  assert.equal(notebook.seeds.length, 3);
-  // Every persisted seed carries a SGT timestamp + the angle survives intact.
-  for (const seed of notebook.seeds) {
-    assert.match(seed.at, /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+08:00/);
+  assert.ok(wrote, "expected validated-seeds.json to be written on pass");
+  assert.equal(validated.seeds.length, 3);
+  // Each emitted seed is normalized to { angle, grounding } — no timestamps,
+  // no merge artifacts — and the angle survives intact.
+  for (const seed of validated.seeds) {
     assert.equal(typeof seed.angle, "string");
+    assert.ok(Array.isArray(seed.grounding));
   }
-});
-
-test("merges new seeds with the existing notebook and drops seeds older than 14 days", () => {
-  const existing = {
-    generated: "2026-05-01T00:00:00.000Z",
-    seeds: [
-      { at: sgtIso(30 * DAY), angle: "STALE — should be dropped (30 days old)", grounding: [] },
-      { at: sgtIso(3 * DAY), angle: "FRESH — should survive (3 days old)", grounding: ["https://rarebit.one"] },
-    ],
-  };
-  const { code, wrote, notebook } = runValidate(CLEAN, existing);
-  assert.equal(code, 0);
-  assert.ok(wrote);
-  const angles = notebook.seeds.map((s) => s.angle);
-  // 3 fresh from this run + the 1 surviving existing seed = 4; stale dropped.
-  assert.equal(notebook.seeds.length, 4);
-  assert.ok(angles.includes("FRESH — should survive (3 days old)"));
-  assert.ok(!angles.some((a) => a.startsWith("STALE")), "stale seed must be dropped");
+  const angles = validated.seeds.map((s) => s.angle);
+  assert.ok(angles.includes("The scout that fills this notebook, end to end"));
 });
 
 test("rejects a blocklisted identifier in a seed angle", () => {
@@ -151,20 +126,14 @@ test("rejects an @handle / email in a seed", () => {
   assert.ok(!email.wrote);
 });
 
-test("empty scout day with no existing notebook is a no-op (exit 0, nothing written)", () => {
+test("empty scout day is a no-op (exit 0, nothing written)", () => {
   const { code, wrote } = runValidate({ seeds: [] });
   assert.equal(code, 0);
-  assert.ok(!wrote, "must not write a notebook when there is nothing to persist");
+  assert.ok(!wrote, "must not write when there are no seeds to publish");
 });
 
-test("empty scout day WITH an existing notebook re-persists the still-fresh existing seeds", () => {
-  const existing = {
-    generated: "2026-06-09T00:00:00.000Z",
-    seeds: [{ at: sgtIso(2 * DAY), angle: "Carried over from yesterday", grounding: [] }],
-  };
-  const { code, wrote, notebook } = runValidate({ seeds: [] }, existing);
+test("a day of only malformed seeds is a clean no-op (exit 0, nothing written)", () => {
+  const { code, wrote } = runValidate({ seeds: [{ angle: "   ", grounding: [] }, {}] });
   assert.equal(code, 0);
-  assert.ok(wrote, "should re-write the notebook to apply retention even with no new seeds");
-  assert.equal(notebook.seeds.length, 1);
-  assert.equal(notebook.seeds[0].angle, "Carried over from yesterday");
+  assert.ok(!wrote, "must not write when no well-formed seed survives the gate");
 });

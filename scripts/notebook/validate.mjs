@@ -1,11 +1,11 @@
-// Notebook pipeline · step 3 of 3 — VALIDATE + MERGE (deterministic).
+// Notebook pipeline · step 3 of 3 — VALIDATE (deterministic, pure, no network).
 //
 // The closing half of the "digest sandwich", and — because the daily workflow
-// writes the merged notebook back to the bucket with NO human review between
-// curate and publish — the SOLE GATE before a seed enters the notebook. The
-// curator is trusted only to phrase; this script decides what may persist. It
-// HARD-FAILS (exit 1, nothing written) if any seed contains anything that
-// could leak a client or smuggle in an off-facts link:
+// turns these seeds straight into PUBLIC GitHub issues with NO human review
+// between curate and publish — the SOLE GATE before a seed becomes a public
+// issue. The curator is trusted only to phrase; this script decides what may
+// be published. It HARD-FAILS (exit 1, nothing written) if any seed contains
+// anything that could leak a client or smuggle in an off-facts link:
 //   1. any private blocklist identifier (private repo names, member logins)
 //   2. any email address or @handle
 //   3. any URL whose origin is NOT on the allowlist built from the facts
@@ -13,49 +13,43 @@
 //      repo>, https://rarebit.one)
 // Mirrors farm-feed/validate.mjs and field-notes/validate.mjs exactly.
 //
-// On pass it timestamps the new seeds, MERGES them with the existing notebook
-// (passed in; may be absent), DROPS any seed older than 14 days (SGT), caps the
-// total, and writes the merged notebook.json. An empty scout day with no
-// existing notebook is a benign no-op (exit 0, nothing written).
+// On pass it writes a deterministic validated-seeds.json = { seeds: [...] }
+// containing only the seeds that passed the gate. The publish step (step 4,
+// scripts/notebook/publish.mjs) turns those into issues; retention is now the
+// issue lifecycle (open = pending, closed = used), not a rolling file — so this
+// script no longer merges, timestamps, retains, or caps. It does NO network and
+// stays pure + unit-testable. An empty (or clean-empty) scout day is a benign
+// no-op (exit 0, nothing written).
 //
 // Inputs:  argv[2] notebook-raw.json (for the blocklist + URL allowlist)
 //          argv[3] seeds.json (the curated seeds)
-//          argv[4] notebook.json (the EXISTING notebook to merge into; may be
-//                  absent — pass a path that doesn't exist, or omit)
-// Output:  argv[5] (default ./notebook.json) — the merged notebook
+// Output:  argv[4] (default ./validated-seeds.json) — the seeds that passed
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const RAW = process.argv[2] ?? "notebook-raw.json";
 const SEEDS = process.argv[3] ?? "seeds.json";
-const EXISTING = process.argv[4]; // existing notebook path; may be absent
-const OUT = process.argv[5] ?? "notebook.json";
-
-const RETENTION_DAYS = 14;
-const MAX_SEEDS = 60;
+const OUT = process.argv[4] ?? "validated-seeds.json";
 
 const fail = (reason) => {
-  console.error(`validate: REJECTED — ${reason}. Nothing written; previous notebook stands.`);
+  console.error(`validate: REJECTED — ${reason}. Nothing written; no issues created.`);
   process.exit(1);
 };
 
 const raw = JSON.parse(readFileSync(RAW, "utf8"));
 const curated = existsSync(SEEDS) ? JSON.parse(readFileSync(SEEDS, "utf8")) : { seeds: [] };
-const existing = EXISTING && existsSync(EXISTING) ? JSON.parse(readFileSync(EXISTING, "utf8")) : { seeds: [] };
 
 const newSeeds = Array.isArray(curated.seeds) ? curated.seeds : [];
-const existingSeeds = Array.isArray(existing.seeds) ? existing.seeds : [];
 
 // --- EMPTY-DAY NO-OP (not a failure) ---------------------------------------
-// No new seeds AND no existing notebook → nothing to persist. Mirrors the
-// empty-day handling in the sibling pipelines; not a policy violation.
-if (newSeeds.length === 0 && existingSeeds.length === 0) {
-  console.log("validate: no new seeds and no existing notebook — skipping (not a rejection).");
+// No seeds to publish → nothing to validate. Mirrors the empty-day handling in
+// the sibling pipelines; not a policy violation.
+if (newSeeds.length === 0) {
+  console.log("validate: no seeds to publish — skipping (not a rejection).");
   process.exit(0);
 }
 
-// --- SHAPE + SCAN gate over the NEW seeds only ------------------------------
-// (Existing seeds already passed this gate on the day they were added.)
+// --- SHAPE + SCAN gate over the seeds ---------------------------------------
 // Build the scan blob from each seed's angle + grounding URLs.
 const blob = newSeeds
   .map((s) => [s?.angle ?? "", ...(Array.isArray(s?.grounding) ? s.grounding : [])].join("\n"))
@@ -102,42 +96,22 @@ for (const rawUrl of urls) {
   if (!ok) fail(`seed contains off-allowlist URL "${url}"`);
 }
 
-// --- ON PASS — timestamp, merge, retain, cap -------------------------------
-// `at` is now as ISO 8601 with the +08:00 (SGT) offset, mirroring field-notes.
-const now = new Date(Date.now() + 8 * 3600_000);
-const at = `${now.toISOString().slice(0, 19)}+08:00`;
-
-const fresh = newSeeds
+// --- ON PASS — write the validated seeds (deterministic, no timestamps) -----
+// Keep only well-formed seeds (non-empty angle), normalized to { angle,
+// grounding } with string-only grounding URLs. The publish step dedups + maps
+// these to issues; the issue lifecycle is the retention mechanism now.
+const validated = newSeeds
   .filter((s) => s && typeof s.angle === "string" && s.angle.trim() !== "")
   .map((s) => ({
-    at,
     angle: s.angle.trim(),
     grounding: (Array.isArray(s.grounding) ? s.grounding : []).filter((u) => typeof u === "string"),
   }));
 
-// Merge fresh + existing, drop anything older than the retention window. The
-// cutoff is computed in real time (UTC instant); each seed's `at` carries its
-// own +08:00 offset so the comparison is zone-correct.
-const cutoff = Date.now() - RETENTION_DAYS * 24 * 3600_000;
-const merged = [...fresh, ...existingSeeds]
-  .filter((s) => s && typeof s.angle === "string")
-  .filter((s) => {
-    const t = Date.parse(s.at);
-    return Number.isNaN(t) ? false : t >= cutoff; // drop undateable / stale seeds
-  });
+// A clean-empty day (seeds present but all malformed) → no-op, nothing written.
+if (validated.length === 0) {
+  console.log("validate: no well-formed seeds after the gate — skipping (not a rejection).");
+  process.exit(0);
+}
 
-// Newest first, then cap. The draft dedupes against past notes downstream;
-// retention + cap keep the notebook bounded without active pruning elsewhere.
-merged.sort((a, b) => String(b.at).localeCompare(String(a.at)));
-const capped = merged.slice(0, MAX_SEEDS);
-
-const notebook = {
-  generated: new Date().toISOString(),
-  window: raw.window,
-  seeds: capped,
-};
-
-writeFileSync(OUT, JSON.stringify(notebook, null, 2));
-console.log(
-  `validate: PASSED — +${fresh.length} new, ${capped.length} total seeds after ${RETENTION_DAYS}d retention → ${OUT}`
-);
+writeFileSync(OUT, JSON.stringify({ seeds: validated }, null, 2));
+console.log(`validate: PASSED — ${validated.length} seed(s) cleared the gate → ${OUT}`);
