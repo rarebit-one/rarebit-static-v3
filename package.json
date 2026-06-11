@@ -13,7 +13,7 @@
     "preview": "astro preview",
     "check": "astro check",
     "astro": "astro",
-    "test": "node --test scripts/farm-feed/*.test.mjs scripts/field-notes/*.test.mjs scripts/freshness/*.test.mjs",
+    "test": "node --test \"scripts/**/*.test.mjs\"",
     "sync:mcp": "node scripts/sync-mcp-open-source.mjs"
   },
   "dependencies": {

@@ -1,0 +1,117 @@
+name: Notebook
+
+# Daily "interesting-work" scout (01:30 SGT / 17:30 UTC):
+# gather (org PUBLIC repos in full, linkable detail; PRIVATE work reduced to
+# anonymized category counts inside the script) → curate (one Haiku call,
+# idea-seeds grounded only in those facts) → validate (the SOLE gate before a
+# seed enters the notebook: hard-fails on any private blocklist identifier,
+# email/@handle, or off-allowlist URL) → merge into the rolling 14-day notebook
+# and write it back to the (PRIVATE) DO Spaces object the weekly Field Note
+# mines. See scripts/notebook/*.
+#
+# The notebook is a PRIVATE artifact — it is uploaded WITHOUT --acl public-read
+# (unlike farm-replay.json, which is public). It accumulates anonymized seeds;
+# the validator is what keeps it leak-free, locked by
+# scripts/notebook/validate.test.mjs (run via `npm test` in CI).
+#
+# Channel: the FARM_FEED_CHANNEL repo variable (default "staging") keys the
+# object path, shared with the farm-feed bucket.
+#
+# Missing any secret → the relevant step no-ops (exit 0) and the notebook is
+# not written, so the workflow stays green until all four are wired up:
+#   FEED_GITHUB_PAT · ANTHROPIC_API_KEY · SPACES_KEY_ID · SPACES_SECRET
+
+on:
+  schedule:
+    - cron: "30 17 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notebook
+  cancel-in-progress: false
+
+jobs:
+  scout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FEED_GITHUB_PAT: ${{ secrets.FEED_GITHUB_PAT }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      SPACES_KEY_ID: ${{ secrets.SPACES_KEY_ID }}
+      SPACES_SECRET: ${{ secrets.SPACES_SECRET }}
+      BUCKET: rarebit-farm-feed
+      SPACES_ENDPOINT: https://sgp1.digitaloceanspaces.com
+      CHANNEL: ${{ vars.FARM_FEED_CHANNEL || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Gather (public detail + anonymized private aggregate)
+        run: node scripts/notebook/gather.mjs notebook-raw.json
+
+      - name: Curate (one LLM call — idea-seeds grounded in the facts)
+        run: node scripts/notebook/curate.mjs notebook-raw.json seeds.json
+
+      - name: Fetch the existing notebook (to merge into)
+        run: |
+          if [ -z "${SPACES_KEY_ID:-}" ] || [ -z "${SPACES_SECRET:-}" ]; then
+            echo "Spaces credentials not set — starting from an empty notebook."
+            exit 0
+          fi
+          export AWS_ACCESS_KEY_ID="$SPACES_KEY_ID"
+          export AWS_SECRET_ACCESS_KEY="$SPACES_SECRET"
+          # Tolerate a 404 on first run (no notebook yet) — validate.mjs treats
+          # a missing existing notebook as an empty starting point.
+          if aws s3 cp "s3://$BUCKET/$CHANNEL/notebook.json" existing-notebook.json \
+            --endpoint-url "$SPACES_ENDPOINT" 2>/dev/null; then
+            echo "Fetched existing notebook."
+          else
+            echo "No existing notebook (first run or 404) — starting fresh."
+          fi
+
+      - name: Validate + merge (the sole gate before a seed persists)
+        id: validate
+        run: |
+          if [ ! -f notebook-raw.json ]; then
+            echo "notebook-raw.json absent (gather no-op'd — no PAT) — skipping."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ ! -f seeds.json ]; then
+            echo "seeds.json absent (curate no-op'd — no ANTHROPIC_API_KEY) — skipping."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          node scripts/notebook/validate.mjs \
+            notebook-raw.json seeds.json existing-notebook.json notebook.json
+          # validate exits 0 without writing on an empty scout day with no
+          # existing notebook — only publish when it actually produced one.
+          if [ -f notebook.json ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No notebook produced (empty scout, no existing) — skipping publish."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish the notebook to Spaces (PRIVATE — no public-read)
+        if: steps.validate.outputs.publish == 'true'
+        run: |
+          if [ -z "${SPACES_KEY_ID:-}" ] || [ -z "${SPACES_SECRET:-}" ]; then
+            echo "::warning::Spaces credentials not set — skipping upload."
+            exit 0
+          fi
+          export AWS_ACCESS_KEY_ID="$SPACES_KEY_ID"
+          export AWS_SECRET_ACCESS_KEY="$SPACES_SECRET"
+          # PRIVATE object: deliberately NO --acl public-read. The notebook holds
+          # accumulated anonymized seeds and is only read server-side at build
+          # (and by field-notes gather) using the same credentials.
+          aws s3 cp notebook.json "s3://$BUCKET/$CHANNEL/notebook.json" \
+            --endpoint-url "$SPACES_ENDPOINT" \
+            --cache-control "no-cache" --content-type application/json
+          echo "Published $CHANNEL/notebook.json (private)"
