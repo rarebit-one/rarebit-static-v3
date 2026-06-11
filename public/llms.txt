@@ -12,6 +12,13 @@ Tools: how_we_work, open_source, intake_questionnaire, submit_inquiry.
 
 - [Home](https://rarebit.one/): what the automation farm runs — lead intake,
   content engines, code review & shipping, reporting, back-office ops, QA.
+- [How we work](https://rarebit.one/how-we-work): a case study in the farm
+  building itself — one operator, parallel agents on isolated worktrees, the
+  gather→draft→validate content pipeline, signed commits and gated auto-land,
+  MCP-first contact, with a live self-demo stats strip.
+- [Operations](https://rarebit.one/operations): the live dashboard — automation
+  runs, systems, green rate, a trend and category breakdown, a 24h-delayed
+  anonymized client-work feed, and what shipped this week (public).
 - [Connect](https://rarebit.one/connect): MCP client setup for Claude, Cursor,
   ChatGPT and any Streamable HTTP client, plus an inquiry form fallback.
 - [Open source](https://rarebit.one/open-source): the Ruby gems the farm runs

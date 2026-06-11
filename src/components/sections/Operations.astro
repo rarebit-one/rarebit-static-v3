@@ -2,7 +2,17 @@
 import Section from "../Section.astro";
 import Heading from "../Heading.astro";
 import Generating from "../Generating.astro";
+import Button from "../Button.astro";
 import { recentMerges, shortDate, farmReplay, FARM_FEED_URL } from "../../lib/farm";
+
+interface Props {
+  /** Home-page teaser: same receipts + digest + art panels + shared replay
+      script, plus a CTA into the standalone /operations live dashboard. The
+      dashboard page does not render this component (it lifts the script). */
+  teaser?: boolean;
+}
+
+const { teaser = false } = Astro.props;
 
 // Receipts: real merges across the org's public repos, fetched at build
 // time. Omitted entirely when the API doesn't answer.
@@ -232,6 +242,14 @@ const freshDigest = (() => {
         />
       </div>
     </div>
+
+    {
+      teaser && (
+        <div class="relative z-1 flex justify-center mt-12 md:mt-15 xl:mt-20">
+          <Button href="/operations">See the live dashboard</Button>
+        </div>
+      )
+    }
   </div>
 </Section>
 

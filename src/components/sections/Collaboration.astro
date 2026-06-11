@@ -3,6 +3,15 @@ import Section from "../Section.astro";
 import Button from "../Button.astro";
 import { collaboration, site } from "../../data/site";
 
+interface Props {
+  /** Home-page teaser: keeps the principle bullets + tool orbit, but the CTA
+      points at the standalone /how-we-work page instead of /connect. The full
+      page renders its own arc above this section and reuses it without a CTA. */
+  teaser?: boolean;
+}
+
+const { teaser = false } = Astro.props;
+
 const rotations = [
   "",
   "rotate-[45deg]",
@@ -42,7 +51,9 @@ const counterRotations = [
           ))
         }
       </ul>
-      <Button href="/connect">Automate with us</Button>
+      <Button href={teaser ? "/how-we-work" : "/connect"}>
+        {teaser ? "How we work" : "Automate with us"}
+      </Button>
     </div>
 
     <div class="mt-15 lg:mt-0 lg:ml-auto xl:w-[37.5rem]">

@@ -21,8 +21,8 @@ export const legal = {
 
 export const navigation = [
   { id: "0", title: "Automations", url: "/#automations" },
-  { id: "1", title: "How we work", url: "/#how-we-work" },
-  { id: "2", title: "Operations", url: "/#operations" },
+  { id: "1", title: "How we work", url: "/how-we-work" },
+  { id: "2", title: "Operations", url: "/operations" },
   { id: "3", title: "Open source", url: "/open-source" },
   { id: "4", title: "Field Notes", url: "/field-notes" },
   { id: "5", title: "Connect", url: "/connect", onlyMobile: true },
@@ -130,9 +130,9 @@ export const roadmap = [
   {
     id: "1",
     title: "Client-facing dashboards",
-    text: "Watch your automations work in real time: live operations feed, throughput, and what shipped this week.",
-    date: "In the works",
-    status: "progress",
+    text: "Watch the automations work: a live operations feed, runs and green-rate, a trend, and what shipped this week — running now at /operations.",
+    date: "Live now",
+    status: "done",
     imageUrl: "/images/roadmap/image-2.webp",
   },
   {

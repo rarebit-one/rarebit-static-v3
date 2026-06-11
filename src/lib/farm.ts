@@ -38,17 +38,59 @@ const GITHUB_ACCEPT = { Accept: "application/vnd.github+json" };
 const FARM_FEED_CHANNEL = import.meta.env.PUBLIC_FARM_FEED_CHANNEL ?? "staging";
 export const FARM_FEED_URL = `https://rarebit-farm-feed.sgp1.digitaloceanspaces.com/${FARM_FEED_CHANNEL}/farm-replay.json`;
 
+export type FarmTotals = { runs: number; systems: number; greenPct: number };
+
 export type FarmReplay = {
   generated: string;
   window: string;
   digest: string;
   events: Array<{ at: string; kind: string; text: string; ok: boolean }>;
+  // Carried through by validate.mjs from the deterministic gather output —
+  // present on artifacts published after the dashboard pipeline change, absent
+  // on older ones. The /operations dashboard reads these for headline metrics
+  // and the category breakdown; every consumer must treat them as optional.
+  totals?: FarmTotals;
+  categories?: string[];
 };
 
 /** The replay artifact, fetched at build time for the SSR digest line.
     Returns null until the pipeline publishes to the bucket. */
 export function farmReplay(): Promise<FarmReplay | null> {
   return memoized("farm-replay", () => fetchJson<FarmReplay>(FARM_FEED_URL));
+}
+
+// The dated archive lives next to the rolling farm-replay.json:
+//   <bucket>/<channel>/archive/<YYYY-MM-DD>.json
+// Derive the base by stripping the rolling filename off FARM_FEED_URL.
+const FARM_ARCHIVE_BASE = FARM_FEED_URL.replace(/\/[^/]*$/, "/archive");
+
+/** A single window in the trend strip. `data` is null for a day with no
+    published archive (a gap, never an error). */
+export type FarmTrendPoint = { date: string; data: FarmReplay | null };
+
+/** The last `days` SGT windows of archived replay artifacts, oldest → newest,
+    for the dashboard trend strip. Missing days are gaps (null), never errors —
+    a dormant bucket yields all-null points and the dashboard renders an empty
+    state. Bounded to ≤14 parallel fetches so a wide window can't fan out. */
+export function farmTrend(days = 7): Promise<FarmTrendPoint[]> {
+  const n = Math.min(Math.max(days, 1), 14);
+  return memoized(`farm-trend:${n}`, async () => {
+    // Derive the last n SGT calendar days (excluding today, which has no
+    // published-yesterday archive), oldest first.
+    const sgtNow = new Date(Date.now() + 8 * 3_600_000);
+    const dates: string[] = [];
+    for (let i = n; i >= 1; i -= 1) {
+      const d = new Date(sgtNow);
+      d.setUTCDate(d.getUTCDate() - i);
+      dates.push(d.toISOString().slice(0, 10));
+    }
+    return Promise.all(
+      dates.map(async (date) => ({
+        date,
+        data: await fetchJson<FarmReplay>(`${FARM_ARCHIVE_BASE}/${date}.json`),
+      }))
+    );
+  });
 }
 
 /** Merged PRs across the org's public repos in the last `days` days. */

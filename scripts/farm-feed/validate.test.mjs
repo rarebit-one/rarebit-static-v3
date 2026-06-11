@@ -69,6 +69,11 @@ test("assembles the artifact from validated templates (the safety contract)", ()
   // carries ×N — proves the assembler, not the model, owns the published shape.
   assert.ok(artifact.events.some((e) => e.text.endsWith("· failed")));
   assert.ok(artifact.events.some((e) => /×\d+$/.test(e.text)));
+  // The artifact now carries the deterministic gather totals + categories so
+  // the live dashboard can render headline metrics + a category breakdown.
+  // These come straight from sanitized.json — they never pass through the LLM.
+  assert.deepEqual(artifact.totals, { runs: 23, systems: 4, greenPct: 96 });
+  assert.deepEqual(artifact.categories, ["deploy", "tests", "scheduled job", "data pipeline"]);
 });
 
 test("rejects a blocklisted identifier", () => {
