@@ -7,22 +7,22 @@
 // The script (validate.mjs) assembles per-event rows from these templates;
 // the model never emits per-event text or any identifier.
 //
-// One Anthropic API call per run (claude-haiku-4-5 — pennies/day). Missing
-// ANTHROPIC_API_KEY → exit 0 with a notice so the workflow no-ops until
-// secrets are wired up.
+// One OpenAI chat-completions call per run (model = OPENAI_MODEL repo var,
+// default gpt-4o). Missing OPENAI_API_KEY → exit 0 with a notice so the
+// workflow no-ops until secrets are wired up.
 //
 // Input:  argv[2] (default ./sanitized.json)
 // Output: argv[3] (default ./phrased.json) — { digest, phrases: {cat: [...]} }
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { voiceHeader } from "../lib/voice.mjs";
+import { callLLM, hasOpenAIKey } from "../lib/llm.mjs";
 
 const IN = process.argv[2] ?? "sanitized.json";
 const OUT = process.argv[3] ?? "phrased.json";
-const KEY = process.env.ANTHROPIC_API_KEY;
 
-if (!KEY) {
-  console.log("phrase: ANTHROPIC_API_KEY not set — skipping (graceful no-op).");
+if (!hasOpenAIKey()) {
+  console.log("phrase: OPENAI_API_KEY not set — skipping (graceful no-op).");
   process.exit(0);
 }
 if (!existsSync(IN)) {
@@ -59,30 +59,15 @@ Rules for phrases:
 - Generic ONLY — never reference a client, product, repo, person, URL, or specific number.
 - Do not append the outcome (green/failed) — the assembler adds that.`;
 
-const response = await fetch("https://api.anthropic.com/v1/messages", {
-  method: "POST",
-  headers: {
-    "x-api-key": KEY,
-    "anthropic-version": "2023-06-01",
-    "content-type": "application/json",
-  },
-  body: JSON.stringify({
-    model: "claude-haiku-4-5",
-    max_tokens: 1024,
-    system,
-    messages: [{ role: "user", content: prompt }],
-  }),
-});
-
-if (!response.ok) {
-  console.error(`phrase: Anthropic API ${response.status} — ${await response.text()}`);
+let text;
+try {
+  text = await callLLM({ system, prompt, maxTokens: 1024, json: true });
+} catch (err) {
+  console.error(`phrase: ${err.message}`);
   process.exit(1);
 }
 
-const data = await response.json();
-const text = (data.content ?? []).filter((b) => b.type === "text").map((b) => b.text).join("");
-
-// The model is asked for bare JSON; tolerate accidental fencing.
+// JSON mode returns clean JSON; tolerate accidental fencing as belt-and-braces.
 const jsonStr = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
 
 let phrased;

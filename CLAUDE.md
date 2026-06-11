@@ -61,7 +61,8 @@ npm run preview  # serve dist/
   generic-language rows. It's a strict **gather → phrase → validate** sandwich: `gather.mjs`
   reduces private workflow runs to category counts + timestamps **inside the script** (repo
   names, branches, logins never leave it); `phrase.mjs` makes the **one** LLM call
-  (`claude-haiku-4-5`) producing only a digest line + generic per-category templates — it never
+  (OpenAI chat-completions; model = `OPENAI_MODEL` repo var, default `gpt-4o`) producing only a
+  digest line + generic per-category templates — it never
   sees raw data or emits identifiers; `validate.mjs` is a hard gate that **exit-1s on any
   blocklisted name, URL, email, @handle, or number absent from the sanitized totals**, then
   assembles the artifact. Output publishes (`aws s3 cp`) to a DO Spaces bucket
@@ -73,8 +74,9 @@ npm run preview  # serve dist/
   stale (`window` ≠ yesterday-SGT) or absent. **Invariants, do not weaken:** the LLM phrases, it
   does not redact; the validator is the gate; nothing is shown sooner than 24h. The gate is locked
   by `scripts/farm-feed/validate.test.mjs` (run via `npm test` in CI) — keep it green. Secrets
-  (user-created): `FEED_GITHUB_PAT`, `ANTHROPIC_API_KEY`, `SPACES_KEY_ID`, `SPACES_SECRET` — each
-  missing one no-ops its step so the workflow stays green until wired up. **Dormant until the
+  (user-created): `FEED_GITHUB_PAT`, `OPENAI_API_KEY`, `SPACES_KEY_ID`, `SPACES_SECRET` (plus the
+  optional `OPENAI_MODEL` repo var) — each missing one no-ops its step so the workflow stays green
+  until wired up. **Dormant until the
   bucket has data** (the client script no-ops on a 404; the SSR receipts + digest stand alone).
 - **Legal footer** (name, UEN, registered address) mirrors `rarebit-ops` `entity/profile.yml` —
   that file is the source of truth; update here when ACRA details change.
@@ -105,13 +107,15 @@ npm run preview  # serve dist/
   gather→draft→validate sandwich: `gather.mjs` collects the last 7 days — PUBLIC repo
   PRs/releases in full, linkable detail; PRIVATE work reduced to anonymized category counts
   **inside the script** (names/logins never leave it, only the `blocklist`). `draft.mjs` makes
-  the one LLM call (`claude-opus-4-8`) grounded only in those facts; it can link back to past
+  the one LLM call (OpenAI chat-completions; model = `OPENAI_MODEL` repo var, default `gpt-4o`)
+  grounded only in those facts; it can link back to past
   notes. `validate.mjs` is the **SOLE pre-publish gate** (no human in the loop): it hard-fails
   on any private blocklist identifier, off-allowlist URL, email/@handle, or dead internal link,
   no-ops a thin week, and writes the markdown the workflow commits to main. Locked by
   `validate.test.mjs` (run via `npm test` in CI). Secrets (user-created): `FEED_GITHUB_PAT`,
-  `ANTHROPIC_API_KEY` — each missing one no-ops its step so the workflow stays green until
-  wired up; direct push to main needs branch protection to permit the bot. `/privacy` documents
+  `OPENAI_API_KEY` (plus the optional `OPENAI_MODEL` repo var) — each missing one no-ops its step
+  so the workflow stays green until wired up; direct push to main needs branch protection to
+  permit the bot. `/privacy` documents
   the no-trackers stance and inquiry-data handling — keep it true (adding any analytics/tracker
   requires updating it). `public/llms.txt` is the AI-readable site summary; keep it in step
   with the page list.

@@ -8,9 +8,10 @@
 // structural marker. The validator (step 3) is the bounded-diff gate that holds
 // it to that; this script just produces the proposal.
 //
-// One Anthropic API call per run (claude-opus-4-8). Missing ANTHROPIC_API_KEY
-// → exit 0 with a notice. Empty signal (gather captured nothing, or its file is
-// absent) → exit 0. Both keep the workflow green and the voice unchanged.
+// One OpenAI chat-completions call per run (model = OPENAI_MODEL repo var,
+// default gpt-4o). Missing OPENAI_API_KEY → exit 0 with a notice. Empty signal
+// (gather captured nothing, or its file is absent) → exit 0. Both keep the
+// workflow green and the voice unchanged.
 //
 // Input:  argv[2] VOICE.md path (default ./VOICE.md)
 //         argv[3] signal.json   (default ./signal.json)
@@ -19,14 +20,14 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { voiceHeader } from "../lib/voice.mjs";
+import { callLLM, hasOpenAIKey } from "../lib/llm.mjs";
 
 const VOICE_PATH = process.argv[2] ?? "VOICE.md";
 const SIGNAL_PATH = process.argv[3] ?? "signal.json";
 const OUT = process.argv[4] ?? "proposal.json";
-const KEY = process.env.ANTHROPIC_API_KEY;
 
-if (!KEY) {
-  console.log("draft: ANTHROPIC_API_KEY not set — skipping (graceful no-op).");
+if (!hasOpenAIKey()) {
+  console.log("draft: OPENAI_API_KEY not set — skipping (graceful no-op).");
   process.exit(0);
 }
 if (!existsSync(SIGNAL_PATH)) {
@@ -74,30 +75,15 @@ Hard rules for the proposal:
 - Do NOT introduce any external URL, email, @handle, or company name into the VOICE-HEADER block — it must stay source-free.
 - The "voiceMd" value must be the complete file content (it replaces VOICE.md entirely). Do NOT pre-edit the changelog block yourself — leave the existing changelog entries exactly as they are; the pipeline prepends your new entry. The changelog string you return is that single new entry, beginning with "${today} — ".`;
 
-const response = await fetch("https://api.anthropic.com/v1/messages", {
-  method: "POST",
-  headers: {
-    "x-api-key": KEY,
-    "anthropic-version": "2023-06-01",
-    "content-type": "application/json",
-  },
-  body: JSON.stringify({
-    model: "claude-opus-4-8",
-    max_tokens: 4096,
-    system,
-    messages: [{ role: "user", content: prompt }],
-  }),
-});
-
-if (!response.ok) {
-  console.error(`draft: Anthropic API ${response.status} — ${await response.text()}`);
+let text;
+try {
+  text = await callLLM({ system, prompt, maxTokens: 4096, json: true });
+} catch (err) {
+  console.error(`draft: ${err.message}`);
   process.exit(1);
 }
 
-const data = await response.json();
-const text = (data.content ?? []).filter((b) => b.type === "text").map((b) => b.text).join("");
-
-// The model is asked for bare JSON; tolerate accidental fencing.
+// JSON mode returns clean JSON; tolerate accidental fencing as belt-and-braces.
 const jsonStr = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
 
 let proposal;

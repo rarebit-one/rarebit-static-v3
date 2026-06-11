@@ -5,7 +5,8 @@ name: Voice evolution
 # nudge that lands can inform that week's note.
 #
 # gather (public frontier-lab signal — robust, per-source try/catch, no secret)
-# → draft (one claude-opus-4-8 call: a SMALL, surgical proposal grounded in the
+# → draft (one OpenAI chat-completions call — model = OPENAI_MODEL repo var,
+#   default gpt-4o: a SMALL, surgical proposal grounded in the
 # current VOICE.md + that signal) → validate (the bounded-diff gate: hard-fails
 # on a rewrite, a dropped invariant, a gimmicky phrase, or a source leaking into
 # the VOICE-HEADER; on pass it prepends one dated changelog entry and writes the
@@ -15,7 +16,7 @@ name: Voice evolution
 #
 # Missing any secret → the relevant step no-ops (exit 0) and nothing is opened,
 # so the workflow stays green until both are wired up:
-#   ANTHROPIC_API_KEY (draft) · AUTOLAND_PAT (checkout token + gh pr create)
+#   OPENAI_API_KEY (draft) · AUTOLAND_PAT (checkout token + gh pr create)
 #
 # The `auto-land` label is created later by Phase 1's enable.sh; until then this
 # workflow is effectively dormant (it no-ops on the missing key / PAT).
@@ -38,7 +39,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
     steps:
       # Use AUTOLAND_PAT as the checkout token so the branch push is authored by
       # a real PAT — that's what makes CI + review trigger on the opened PR.
