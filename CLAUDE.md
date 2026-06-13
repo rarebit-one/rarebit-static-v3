@@ -142,13 +142,14 @@ npm run preview  # serve dist/
 - Template raster/SVG assets under `public/images/` come from the Brainwave UI8 kit (licensed via
   the v1 purchase); brand assets under `public/images/rarebit/`.
 
-## Gated auto-land (scoped exception to workspace Rule #7)
+## Gated auto-land (in-repo automation of Rule #7)
 
-PRs in **this repo only** can auto-merge once reviewed + green, with no human merge step. This is
-a **deliberate, scoped exception** to workspace `CLAUDE.md` Rule #7 ("agents never merge PRs
-autonomously"); that rule remains in full force in every other repo. The exception lives entirely
-in this repo's settings + workflows — nothing here changes how `/ship`, `/land`, or `/release`
-behave elsewhere. Tracked in issue #29.
+PRs in this repo auto-merge once reviewed + green, with no manual merge step at all. This
+**aligns with** workspace `CLAUDE.md` Rule #7 (merge autonomously once required CI is green,
+mergeable, and any required review is satisfied) — it just *automates* that merge here via repo
+settings + workflows instead of an agent invoking `/ship`/`/land`. The wider workspace reaches the
+same outcome (autonomous merge on green); this repo wires it into the repo's settings + CI so it
+happens with zero human or agent intervention. Tracked in issue #29.
 
 - **`.github/workflows/review-verdict.yml`** (+ `.github/scripts/review-verdict.mjs`) — the
   binding, repo-local review gate. On every PR push it sends the diff to the OpenAI API (via the
@@ -177,8 +178,9 @@ behave elsewhere. Tracked in issue #29.
   `review/clear` run, then the sweeper merges it.
 
 **Future agents: do NOT "fix" `auto-land.yml` or `field-notes.yml`'s PR-path (or this section) as
-a Rule #7 governance violation.** It is intentional and scoped to this repo. If you think it's
-wrong, raise it with the owner via issue #29 — don't revert it.
+a Rule #7 governance violation.** It is the intended automation of Rule #7's autonomous-merge
+policy for this repo, not a contradiction of it. If you think it's wrong, raise it with the owner
+via issue #29 — don't revert it.
 
 This is a separate git repo in the `rarebit-one` org — `cd` here before git ops. Worktree-only
 workflow and signed commits per the workspace CLAUDE.md.
