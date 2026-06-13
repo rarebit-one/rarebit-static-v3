@@ -56,7 +56,7 @@ export const benefits = [
   {
     id: "2",
     title: "Code review & shipping",
-    text: "Agents triage issues, open pull requests, and babysit CI to green. Humans approve the merge.",
+    text: "Agents triage issues, open pull requests, babysit CI to green, and approved PRs auto-land.",
     backgroundUrl: "/images/benefits/card-3.svg",
     iconUrl: "/images/benefits/icon-3.svg",
     imageUrl: "/images/benefits/image-2.webp",

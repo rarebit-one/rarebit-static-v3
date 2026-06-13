@@ -44,3 +44,8 @@ The numbers on the [home page](/) are fetched from public GitHub and RubyGems
 when the site builds, the [MCP endpoint](/connect) answers from the same repo
 that serves this page, and the inquiry form writes to the same inbox the
 agents triage. Small team. The site is the demo.
+
+
+## Update (2026-06-13)
+
+When this was written, humans clicked merge. Since then, reviewed PRs auto-land — see [/how-we-work](/how-we-work).
