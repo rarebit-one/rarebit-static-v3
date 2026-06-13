@@ -30,10 +30,78 @@
 // Output: writes facts.json to the path in argv[2] (default ./facts.json).
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { parseMarker } from "../lib/issues.mjs";
+
+// True only when this file is run directly (node gather.mjs), not when imported
+// (e.g. by the unit test that exercises scrubCrossOrg). Guards the no-token
+// exit + main() so importing the module has no side effects.
+const isEntryPoint =
+  process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 
 const ORG = "rarebit-one";
 const TOKEN = process.env.FEED_GITHUB_PAT || process.env.GITHUB_TOKEN;
+
+// --- Cross-org / sibling-org name scrub (deterministic) --------------------
+// gpt-4o keeps surfacing split-out SIBLING-org names ("luminality" → org
+// "luminalityai") inside the note even after the draft prompt forbids it and
+// the review/clear rubric blocks it — negative prompt instructions are
+// unreliable (#54). A public rarebit-one PR can legitimately mention such a
+// name in its title/body (e.g. rarebit-one/.github#39 renamed luminality-* →
+// luminalityai). Matching this repo's design philosophy — "the LLM phrases, it
+// does not redact; the gather/validator enforce" — we strip these tokens from
+// the PUBLIC text fields BEFORE they reach the LLM, so the model literally
+// never sees them. The review/clear rubric and validate gate stay as the
+// backstop; this just stops the model ever emitting the tokens.
+//
+// IMPORTANT: this scrubs cross-org NAME tokens out of human-readable text only.
+// It does NOT touch URLs that point at rarebit-one's OWN public repos (e.g.
+// github.com/rarebit-one/.github/pull/39), and it must never match rarebit-one's
+// own repo names (standard_id, rarebit-static-v3, …). Extend SIBLING_ORG_TOKENS
+// as more sibling/cross orgs split out.
+const SIBLING_ORG_TOKENS = [
+  "luminalityai",
+  "luminality-web",
+  "luminality-app",
+  "luminality-ui",
+  "luminality",
+];
+const CROSS_ORG_PLACEHOLDER = "a sibling project";
+
+// Replace any cross-org/sibling-org name token in human-readable text with a
+// neutral placeholder. Pure function (no I/O) so it's unit-testable and reused
+// across PR titles, release names, and seed angles/grounding text.
+//
+//  - Case-insensitive, identifier-boundary aware (won't fire mid-word).
+//  - Collapses the "luminality-web/app/ui" slash shorthand to ONE placeholder.
+//  - Longest tokens first, so "luminality-web" wins over bare "luminality".
+//  - Leaves URLs and rarebit-one's own repo names untouched: it only matches
+//    the listed tokens, and the boundary check means a token embedded in a URL
+//    path segment (e.g. rarebit-one/.github) is unaffected unless it's one of
+//    these exact sibling names.
+export function scrubCrossOrg(text) {
+  if (typeof text !== "string" || text === "") return text;
+  let out = text;
+
+  // 1. Collapse the "luminality-web/app/ui" (and "luminality-web/app",
+  //    "luminality-app/ui", …) slash shorthand to a single placeholder so we
+  //    don't emit "a sibling project/app/ui".
+  out = out.replace(
+    /\bluminality(?:-(?:web|app|ui))?(?:\/(?:web|app|ui))+\b/gi,
+    CROSS_ORG_PLACEHOLDER
+  );
+
+  // 2. Replace each remaining standalone sibling token, longest first, at a
+  //    non-identifier boundary (so it never fires inside a larger identifier).
+  for (const token of [...SIBLING_ORG_TOKENS].sort((a, b) => b.length - a.length)) {
+    const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out = out.replace(
+      new RegExp(`(^|[^A-Za-z0-9_-])${escaped}(?![A-Za-z0-9_-])`, "gi"),
+      (_m, pre) => `${pre}${CROSS_ORG_PLACEHOLDER}`
+    );
+  }
+  return out;
+}
 const OUT = process.argv[2] ?? "facts.json";
 const TZ_OFFSET = "+08:00"; // SGT — the farm runs on Singapore time
 const SEED_LABEL = "field-note-seed";
@@ -41,7 +109,7 @@ const SEED_LABEL = "field-note-seed";
 const SEED_MARKER_TYPE = "seed";
 const SEED_REPO = process.env.GITHUB_REPOSITORY || "rarebit-one/rarebit-static-v3";
 
-if (!TOKEN) {
+if (isEntryPoint && !TOKEN) {
   console.log("gather: no FEED_GITHUB_PAT / GITHUB_TOKEN set — skipping (graceful no-op).");
   process.exit(0);
 }
@@ -134,7 +202,10 @@ async function fetchNotebookSeeds() {
       );
     }
     if (!angle) continue;
-    seeds.push({ issue: issue.number, angle, grounding });
+    // The angle is human-readable and reaches the LLM as a candidate angle —
+    // scrub cross-org names from it. `grounding` is left as-is: it's URLs only
+    // (the validator gates them against the public-facts allowlist).
+    seeds.push({ issue: issue.number, angle: scrubCrossOrg(angle), grounding });
   }
   return seeds;
 }
@@ -204,7 +275,9 @@ async function main() {
     prs.push({
       repo: fullName.split("/")[1],
       number: item.number,
-      title: item.title,
+      // Scrub cross-org names from the human-readable title before it can reach
+      // the LLM (repo name + url are rarebit-one's own — left untouched).
+      title: scrubCrossOrg(item.title),
       url: item.html_url,
     });
   }
@@ -220,8 +293,10 @@ async function main() {
       if (at < startUtc || at > endUtc) continue;
       releases.push({
         repo: repo.name,
-        name: rel.name || rel.tag_name,
-        tag: rel.tag_name,
+        // Release name/tag are human-readable and reach the LLM — scrub them
+        // (repo name + url are rarebit-one's own — left untouched).
+        name: scrubCrossOrg(rel.name || rel.tag_name),
+        tag: scrubCrossOrg(rel.tag_name),
         url: rel.html_url,
       });
     }
@@ -303,7 +378,9 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error(`gather: ${error.message}`);
-  process.exit(1);
-});
+if (isEntryPoint) {
+  main().catch((error) => {
+    console.error(`gather: ${error.message}`);
+    process.exit(1);
+  });
+}
