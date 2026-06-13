@@ -44,11 +44,11 @@ jobs:
     steps:
       # Use AUTOLAND_PAT as the checkout token so the branch push is authored by
       # a real PAT — that's what makes CI + review trigger on the opened PR.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           token: ${{ secrets.AUTOLAND_PAT }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
 
