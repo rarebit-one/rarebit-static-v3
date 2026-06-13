@@ -86,7 +86,9 @@ jobs:
           # Derive the slug from the new note's filename for the branch name.
           note_path="$(git status --porcelain src/content/field-notes | awk '{print $2}' | grep '\.md$' | head -n1)"
           slug="$(basename "$note_path" .md)"
-          branch="field-notes/${slug}"
+          # The slug is usually unique, but guard against a same-day re-run
+          # colliding on `git checkout -b` by appending the run id.
+          branch="field-notes/${slug}-${GITHUB_RUN_ID}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$branch"
@@ -94,6 +96,9 @@ jobs:
           git commit -m "Field notes: weekly entry (${slug})"
           # Push with AUTOLAND_PAT (the checkout token) so CI + review-verdict run.
           git push --set-upstream origin "$branch"
+          # Ensure the `auto-land` label exists so `gh pr create --label` can't
+          # fail the run if the label was never bootstrapped (enable.sh).
+          gh label create auto-land --color "0E8A16" --description "Opt this PR into gated auto-merge once green + review-clear" --force || true
           # Open the PR labeled `auto-land` so the sweeper merges it once green.
           gh pr create \
             --title "Field notes: ${slug}" \

@@ -79,13 +79,17 @@ jobs:
             git checkout -- VOICE.md
             exit 0
           fi
-          branch="voice/$(date +%Y-%m-%d)"
+          # Append the run id so a same-day re-run can't collide on the branch.
+          branch="voice/$(date +%Y-%m-%d)-${GITHUB_RUN_ID}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$branch"
           git add VOICE.md
           git commit -m "Voice: weekly evolution"
           git push --set-upstream origin "$branch"
+          # Ensure the `auto-land` label exists so `gh pr create --label` can't
+          # fail the run if the label was never bootstrapped (enable.sh).
+          gh label create auto-land --color "0E8A16" --description "Opt this PR into gated auto-merge once green + review-clear" --force || true
           gh pr create \
             --title "Voice: weekly evolution ($(date +%Y-%m-%d))" \
             --body "Weekly bounded evolution of VOICE.md, proposed from this week's public frontier-lab signal and held to a small, structure-preserving diff by \`scripts/voice/validate.mjs\`. The new changelog entry at the top of VOICE.md describes the nudge; revert by reverting this PR." \

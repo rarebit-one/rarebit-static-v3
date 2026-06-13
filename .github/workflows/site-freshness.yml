@@ -84,13 +84,17 @@ jobs:
             echo "AUTOLAND_PAT not set — skipping PR open (working tree changes left uncommitted)."
             exit 0
           fi
-          BRANCH="freshness/$(date +%Y-%m-%d)"
+          # Append the run id so a same-day re-run can't collide on the branch.
+          BRANCH="freshness/$(date +%Y-%m-%d)-${GITHUB_RUN_ID}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
           git add -A
           git commit -m "Site freshness: weekly drift sweep"
           git push -u origin "$BRANCH"
+          # Ensure the `auto-land` label exists so `gh pr create --label` can't
+          # fail the run if the label was never bootstrapped (enable.sh).
+          gh label create auto-land --color "0E8A16" --description "Opt this PR into gated auto-merge once green + review-clear" --force || true
           gh pr create \
             --title "Site freshness: weekly drift sweep" \
             --body "Automated weekly drift sweep. Bounded copy edits to stale static claims, and append-only addenda on drifted field notes (original prose preserved byte-for-byte by the validator). Opened for auto-land review." \
