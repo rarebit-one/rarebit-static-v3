@@ -15,3 +15,18 @@ npm-debug.log*
 
 # macOS
 .DS_Store
+
+# sensors/actors pipeline scratch artifacts (issue #56) — these are produced at
+# the repo root by the weekly workflows (gather/draft/validate/claim outputs) and
+# must never be committed into an auto-land PR. Ignoring them keeps `git add -A`
+# in the drift-actor workflow from sweeping scratch JSON into the diff.
+/signal.json
+/state.json
+/patch.json
+/claim.json
+/proposal.json
+/facts.json
+/draft.json
+/seeds.json
+/notebook-raw.json
+/validated-seeds.json

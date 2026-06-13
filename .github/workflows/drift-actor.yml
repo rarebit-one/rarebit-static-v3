@@ -1,0 +1,138 @@
+name: Drift actor
+
+# The CONSUMER half of the split site-freshness pair (issue #56). In the
+# sensors/actors paradigm (docs/architecture/sensors-and-actors.md) this ACTS:
+# it consumes an open `drift` issue filed by the drift sensor (drift-sensor.yml),
+# claims it, RE-GATHERS fresh worktree state (the worktree is the source of truth
+# at run time), runs the UNCHANGED bounded patch sandwich, and opens an
+# `auto-land` PR with the bounded fix.
+#
+#   act (scripts/freshness/act.mjs — claim the oldest open `drift` via the
+#     `in-progress` label, write claim.json) → gather
+#     (scripts/freshness/gather.mjs — fresh state.json) → draft
+#     (scripts/freshness/draft.mjs — one OpenAI call, model = OPENAI_MODEL repo
+#     var, default gpt-4o: copyEdits for stale static copy + APPEND-ONLY addenda
+#     for drifted notes) → validate (scripts/freshness/validate.mjs — the gate,
+#     REUSED VERBATIM: applies the patch ONLY if every check passes and ENFORCES
+#     byte-for-byte preservation of original note prose).
+#   If validate changed the working tree, open an `auto-land` PR whose body says
+#   `Closes #<n>` — so the drift issue closes when the PR MERGES (same as
+#   field-notes closes its seed on publish). On a NO-OP / empty sweep, the claim
+#   is RELEASED (in-progress removed) so a later run retries — the queue self-heals.
+#
+# Sat 22:00 UTC — after the sensor (Sat 21:00).
+#
+# Missing any secret → the relevant step no-ops (exit 0) and no PR is opened, so
+# the workflow stays green until all are wired up:
+#   FEED_GITHUB_PAT (optional — local reads work without it) · OPENAI_API_KEY
+#   (draft) · AUTOLAND_PAT (open the PR as a bot that can trigger downstream checks)
+# The `drift` + `in-progress` labels are created at runtime (ensureLabel), so a
+# missing label never errors (#55).
+
+on:
+  schedule:
+    - cron: "0 22 * * 6"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: drift-actor
+  cancel-in-progress: false
+
+jobs:
+  act:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FEED_GITHUB_PAT: ${{ secrets.FEED_GITHUB_PAT }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Check out with the auto-land PAT so the push + PR are attributed to
+          # the bot and can trigger downstream checks. Falls back to the default
+          # token when the PAT isn't set (push works; PR-open step no-ops).
+          token: ${{ secrets.AUTOLAND_PAT || github.token }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Act (claim an open drift issue)
+        run: node scripts/freshness/act.mjs claim.json
+
+      - name: Gather (re-read the worktree → fresh state.json)
+        run: |
+          if [ ! -f claim.json ]; then
+            echo "claim.json absent (no open drift issue claimed) — nothing to sweep."
+            exit 0
+          fi
+          node scripts/freshness/gather.mjs state.json
+
+      - name: Draft (one LLM call — bounded patch proposal)
+        run: |
+          if [ ! -f state.json ]; then
+            echo "state.json absent (no claim) — nothing to draft."
+            exit 0
+          fi
+          node scripts/freshness/draft.mjs state.json patch.json
+
+      - name: Validate + apply (the gate; byte-for-byte preservation)
+        run: |
+          if [ ! -f patch.json ]; then
+            echo "patch.json absent (secrets not yet wired) — nothing to validate."
+            exit 0
+          fi
+          node scripts/freshness/validate.mjs state.json patch.json
+
+      - name: Open an auto-land PR (if the sweep changed anything) or release the claim
+        env:
+          GH_TOKEN: ${{ secrets.AUTOLAND_PAT }}
+        run: |
+          issue=""
+          if [ -f claim.json ]; then
+            issue="$(node -e 'try{const c=require("./claim.json");process.stdout.write(String(c.issue??""))}catch{process.stdout.write("")}')"
+          fi
+
+          # Scratch artifacts (claim/state/patch json) are gitignored, so a clean
+          # porcelain here means validate applied no real source edits.
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No drift to fix — nothing to open."
+            # Release the claim so the open drift issue is retried next run.
+            if [ -n "$issue" ]; then
+              GH_TOKEN="${{ secrets.GITHUB_TOKEN }}" node -e 'import("./scripts/lib/issues.mjs").then(m=>m.unclaimIssue(Number(process.argv[1])))' "$issue" || true
+            fi
+            exit 0
+          fi
+          if [ -z "$GH_TOKEN" ]; then
+            echo "AUTOLAND_PAT not set — skipping PR open (working tree changes left uncommitted)."
+            if [ -n "$issue" ]; then
+              GH_TOKEN="${{ secrets.GITHUB_TOKEN }}" node -e 'import("./scripts/lib/issues.mjs").then(m=>m.unclaimIssue(Number(process.argv[1])))' "$issue" || true
+            fi
+            exit 0
+          fi
+          # Append the run id so a same-day re-run can't collide on the branch (#55).
+          BRANCH="freshness/$(date +%Y-%m-%d)-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          # Scratch artifacts are gitignored, so -A only stages the real source edits.
+          git add -A
+          git commit -m "Site freshness: weekly drift sweep"
+          # Ensure the `auto-land` label exists so `gh pr create --label` can't fail
+          # the run if the label was never bootstrapped (enable.sh) (#55).
+          gh label create auto-land --color "0E8A16" --description "Opt this PR into gated auto-merge once green + review-clear" --force || true
+          close_line=""
+          if [ -n "$issue" ]; then close_line="
+
+          Closes #${issue}."; fi
+          gh pr create \
+            --title "Site freshness: weekly drift sweep" \
+            --body "Automated weekly drift sweep, consumed from an open \`drift\` issue. Bounded copy edits to stale static claims, and append-only addenda on drifted field notes (original prose preserved byte-for-byte by \`scripts/freshness/validate.mjs\`). Opened for auto-land review.${close_line}" \
+            --label auto-land

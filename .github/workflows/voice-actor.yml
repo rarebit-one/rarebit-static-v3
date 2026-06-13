@@ -1,0 +1,131 @@
+name: Voice actor
+
+# The CONSUMER half of the split voice-evolution pair (issue #56). In the
+# sensors/actors paradigm (docs/architecture/sensors-and-actors.md) this ACTS:
+# it consumes an open `voice-proposal` issue filed by the voice sensor
+# (voice-sensor.yml), reproduces that issue's carried public signal, runs the
+# UNCHANGED bounded-diff sandwich, and opens an `auto-land` PR with the new
+# VOICE.md. It does NOT scan frontier labs itself — the sensor did; the actor
+# trusts the queue (the issue is the trust boundary).
+#
+#   act (scripts/voice/act.mjs — claim the oldest open `voice-proposal` via the
+#     `in-progress` label, reconstruct signal.json + claim.json) → draft
+#     (scripts/voice/draft.mjs — one OpenAI call, model = OPENAI_MODEL repo var,
+#     default gpt-4o: a small, surgical proposal) → validate
+#     (scripts/voice/validate.mjs — the #54 bounded-diff gate, REUSED VERBATIM:
+#     hard-fails a rewrite, a dropped invariant, a gimmicky phrase, or a source
+#     leaking into the VOICE-HEADER; on pass prepends one dated changelog entry).
+#   If VOICE.md changed, open an `auto-land` PR whose body says `Closes #<n>` — so
+#   the proposal issue closes when that PR MERGES (same as field-notes closes its
+#   seed on publish). On a NO-OP / rejected gate, the claim is RELEASED
+#   (in-progress removed) so a later run retries — the queue self-heals.
+#
+# Sun 21:00 UTC — after the sensor (Sun 20:00) and before field-notes (Sun 22:00).
+#
+# Missing any secret → the relevant step no-ops (exit 0) and nothing is opened, so
+# the workflow stays green until both are wired up:
+#   OPENAI_API_KEY (draft) · AUTOLAND_PAT (checkout token + gh pr create)
+# The `voice-proposal` + `in-progress` labels are created at runtime
+# (ensureLabel), so a missing label never errors (#55).
+
+on:
+  schedule:
+    - cron: "0 21 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: voice-actor
+  cancel-in-progress: false
+
+jobs:
+  act:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      # Use AUTOLAND_PAT as the checkout token so the branch push is authored by a
+      # real PAT — that's what makes CI + review trigger on the opened PR.
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.AUTOLAND_PAT || github.token }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Act (claim an open voice-proposal; reconstruct its signal)
+        run: node scripts/voice/act.mjs signal.json claim.json
+
+      - name: Draft (one LLM call — a small, bounded proposal)
+        run: |
+          if [ ! -f signal.json ]; then
+            echo "signal.json absent (no open proposal claimed) — nothing to draft."
+            exit 0
+          fi
+          node scripts/voice/draft.mjs VOICE.md signal.json proposal.json
+
+      - name: Validate (the bounded-diff gate; writes VOICE.md only on pass)
+        run: |
+          if [ ! -f proposal.json ]; then
+            echo "proposal.json absent (no key or empty signal) — skipping."
+            exit 0
+          fi
+          node scripts/voice/validate.mjs VOICE.md proposal.json VOICE.md
+
+      - name: Open auto-land PR (if the voice changed) or release the claim
+        env:
+          GH_TOKEN: ${{ secrets.AUTOLAND_PAT }}
+        run: |
+          # The claimed issue number (written by act.mjs), if any.
+          issue=""
+          if [ -f claim.json ]; then
+            issue="$(node -e 'try{const c=require("./claim.json");process.stdout.write(String(c.issue??""))}catch{process.stdout.write("")}')"
+          fi
+
+          if [ -z "$(git status --porcelain VOICE.md)" ]; then
+            echo "VOICE.md unchanged (no proposal, thin signal, or gate rejected)."
+            # Release the claim so the open proposal is retried next run. Use the
+            # built-in token here (not the PAT, which may be unset).
+            if [ -n "$issue" ]; then
+              GH_TOKEN="${{ secrets.GITHUB_TOKEN }}" node -e 'import("./scripts/lib/issues.mjs").then(m=>m.unclaimIssue(Number(process.argv[1])))' "$issue" || true
+            fi
+            exit 0
+          fi
+          if [ -z "$GH_TOKEN" ]; then
+            echo "AUTOLAND_PAT not set — voice evolved locally but cannot open a PR. No-op."
+            git checkout -- VOICE.md
+            if [ -n "$issue" ]; then
+              GH_TOKEN="${{ secrets.GITHUB_TOKEN }}" node -e 'import("./scripts/lib/issues.mjs").then(m=>m.unclaimIssue(Number(process.argv[1])))' "$issue" || true
+            fi
+            exit 0
+          fi
+          # Append the run id so a same-day re-run can't collide on the branch (#55).
+          branch="voice/$(date +%Y-%m-%d)-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add VOICE.md
+          git commit -m "Voice: weekly evolution"
+          git push --set-upstream origin "$branch"
+          # Ensure the `auto-land` label exists so `gh pr create --label` can't fail
+          # the run if the label was never bootstrapped (enable.sh) (#55).
+          gh label create auto-land --color "0E8A16" --description "Opt this PR into gated auto-merge once green + review-clear" --force || true
+          # `Closes #<issue>` makes the voice-proposal close when this PR MERGES.
+          close_line=""
+          if [ -n "$issue" ]; then close_line="
+
+          Closes #${issue}."; fi
+          gh pr create \
+            --title "Voice: weekly evolution ($(date +%Y-%m-%d))" \
+            --body "Weekly bounded evolution of \`VOICE.md\`, consumed from an open \`voice-proposal\` issue and held to a small, structure-preserving diff by \`scripts/voice/validate.mjs\` (the #54 gate). The new changelog entry at the top of VOICE.md describes the nudge; revert by reverting this PR.${close_line}" \
+            --label auto-land \
+            --base main \
+            --head "$branch"

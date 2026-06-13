@@ -1,0 +1,51 @@
+name: Drift sensor
+
+# The PRODUCER half of the split site-freshness pair (issue #56). In the
+# sensors/actors paradigm (docs/architecture/sensors-and-actors.md) this SENSES
+# only: it reads the worktree's capability signals + checkable static claims and
+# files ONE `drift` issue stating a weekly freshness sweep is warranted. It NEVER
+# edits files, calls the LLM, or opens a PR — the drift ACTOR (drift-actor.yml)
+# does that, consuming the issue. They share only the `drift` label + marker schema.
+#
+#   gather (scripts/freshness/gather.mjs — reads the worktree, local-first) →
+#   sense (scripts/freshness/sense.mjs — emits one deduped `drift` issue).
+#
+# Sat 21:00 UTC — BEFORE the drift actor (Sat 22:00 UTC), away from field-notes
+# (Sun 22:00) and farm-feed: a sensed sweep can be acted on the same night.
+#
+# An empty/corrupt worktree state → sense no-ops. The `drift` label is created at
+# runtime by sense.mjs (ensureLabel), so a missing label never errors (#55).
+# FEED_GITHUB_PAT is optional (only the gather's live facts use it).
+
+on:
+  schedule:
+    - cron: "0 21 * * 6"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: drift-sensor
+  cancel-in-progress: false
+
+jobs:
+  sense:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FEED_GITHUB_PAT: ${{ secrets.FEED_GITHUB_PAT }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Gather (read the worktree → state.json)
+        run: node scripts/freshness/gather.mjs state.json
+
+      - name: Sense (file a deduped drift issue, if warranted)
+        run: node scripts/freshness/sense.mjs state.json

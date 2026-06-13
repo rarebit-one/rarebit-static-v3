@@ -30,12 +30,15 @@
 // Output: writes facts.json to the path in argv[2] (default ./facts.json).
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { parseMarker } from "../lib/issues.mjs";
 
 const ORG = "rarebit-one";
 const TOKEN = process.env.FEED_GITHUB_PAT || process.env.GITHUB_TOKEN;
 const OUT = process.argv[2] ?? "facts.json";
 const TZ_OFFSET = "+08:00"; // SGT — the farm runs on Singapore time
 const SEED_LABEL = "field-note-seed";
+// The marker TYPE token is "seed" (NOT the label) — see scripts/notebook/publish.mjs.
+const SEED_MARKER_TYPE = "seed";
 const SEED_REPO = process.env.GITHUB_REPOSITORY || "rarebit-one/rarebit-static-v3";
 
 if (!TOKEN) {
@@ -76,13 +79,18 @@ async function gh(path) {
 }
 
 // --- Notebook seeds (open `field-note-seed` GitHub issues) -----------------
-// The daily notebook scout files each idea-seed as a PUBLIC issue labeled
-// `field-note-seed`, with a hidden round-trip marker `<!-- seed:{json} -->` in
-// the body. We list the OPEN ones (open = pending candidate) and recover the
-// structured seed from the marker, falling back to the title as the angle plus
-// any URLs scraped from the body. Best-effort: a failed listing or no open
-// seeds returns null and the gather proceeds without seeds. Carries the issue
-// number so the draft step can report which seeds it used (to close them).
+// The daily notebook scout (a SENSOR) files each idea-seed as a PUBLIC issue
+// labeled `field-note-seed`, with a hidden round-trip marker `<!-- seed:{json} -->`
+// in the body. This gather is the ACTOR's "read the queue" step: we list the OPEN
+// ones (open = pending candidate) and recover the structured seed from the marker
+// via the shared parseMarker contract (scripts/lib/issues.mjs) — the SAME marker
+// schema the publisher writes — falling back to the title as the angle plus any
+// URLs scraped from the body. We fetch over the REST API here (not the `gh` CLI
+// that listOpenIssues uses) because this script already runs token-authed fetch;
+// only the marker parsing is shared, which is what makes the round-trip reliable.
+// Best-effort: a failed listing or no open seeds returns null and the gather
+// proceeds without seeds. Carries the issue number so the draft step can report
+// which seeds it used (to close them).
 async function fetchNotebookSeeds() {
   let issues;
   try {
@@ -109,19 +117,15 @@ async function fetchNotebookSeeds() {
     // The issues endpoint also returns PRs; skip those.
     if (issue?.pull_request) continue;
     const body = String(issue?.body ?? "");
-    const marker = body.match(/<!--\s*seed:(\{[\s\S]*?\})\s*-->/);
+    const marker = parseMarker(body, SEED_MARKER_TYPE);
     let angle = "";
     let grounding = [];
     if (marker) {
-      try {
-        const seed = JSON.parse(marker[1]);
-        if (typeof seed?.angle === "string") angle = seed.angle.trim();
-        grounding = (Array.isArray(seed?.grounding) ? seed.grounding : []).filter(
-          (u) => typeof u === "string"
-        );
-      } catch {
-        // fall through to title/body scrape
-      }
+      const seed = marker.data;
+      if (typeof seed?.angle === "string") angle = seed.angle.trim();
+      grounding = (Array.isArray(seed?.grounding) ? seed.grounding : []).filter(
+        (u) => typeof u === "string"
+      );
     }
     if (!angle) angle = String(issue?.title ?? "").trim();
     if (!grounding.length) {

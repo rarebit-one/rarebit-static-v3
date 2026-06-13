@@ -1,0 +1,52 @@
+name: Voice sensor
+
+# The PRODUCER half of the split voice-evolution pair (issue #56). In the
+# sensors/actors paradigm (docs/architecture/sensors-and-actors.md) this SENSES
+# only: it reads this week's public frontier-lab signal and, if there is signal,
+# files ONE `voice-proposal` issue describing a warranted bounded VOICE.md change.
+# It NEVER edits files, calls the LLM, or opens a PR — the voice ACTOR
+# (voice-actor.yml) does that, consuming the issue. They share only the
+# `voice-proposal` label + marker schema.
+#
+#   gather (scripts/voice/gather.mjs — public, robust, no secret) → sense
+#   (scripts/voice/sense.mjs — emits one deduped `voice-proposal` issue).
+#
+# Sun 20:00 UTC — BEFORE the voice actor (Sun 21:00 UTC), which is itself before
+# field-notes (Sun 22:00 UTC): a sensed proposal can be acted on the same night,
+# and a landed voice nudge can inform that week's note.
+#
+# No GitHub token isn't possible in Actions (GITHUB_TOKEN is always present), but
+# an empty signal week → sense no-ops. The `voice-proposal` label is created at
+# runtime by sense.mjs (ensureLabel), so a missing label never errors (#55).
+
+on:
+  schedule:
+    - cron: "0 20 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: voice-sensor
+  cancel-in-progress: false
+
+jobs:
+  sense:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Gather (public frontier-lab signal)
+        run: node scripts/voice/gather.mjs signal.json
+
+      - name: Sense (file a deduped voice-proposal issue, if warranted)
+        run: node scripts/voice/sense.mjs signal.json
