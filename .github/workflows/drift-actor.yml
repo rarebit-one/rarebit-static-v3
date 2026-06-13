@@ -91,7 +91,7 @@ jobs:
           fi
           node scripts/freshness/validate.mjs state.json patch.json
 
-      - name: Open an auto-land PR (if the sweep changed anything) or release the claim
+      - name: Open an auto-land PR (if the sweep changed anything)
         env:
           GH_TOKEN: ${{ secrets.AUTOLAND_PAT }}
         run: |
@@ -100,21 +100,15 @@ jobs:
             issue="$(node -e 'try{const c=require("./claim.json");process.stdout.write(String(c.issue??""))}catch{process.stdout.write("")}')"
           fi
 
-          # Scratch artifacts (claim/state/patch json) are gitignored, so a clean
-          # porcelain here means validate applied no real source edits.
+          # Scratch artifacts (claim/state/patch json, pr-opened.flag) are
+          # gitignored, so a clean porcelain here means validate applied no real
+          # source edits.
           if [ -z "$(git status --porcelain)" ]; then
-            echo "No drift to fix — nothing to open."
-            # Release the claim so the open drift issue is retried next run.
-            if [ -n "$issue" ]; then
-              GH_TOKEN="${{ secrets.GITHUB_TOKEN }}" node -e 'import("./scripts/lib/issues.mjs").then(m=>m.unclaimIssue(Number(process.argv[1])))' "$issue" || true
-            fi
+            echo "No drift to fix — nothing to open. Claim released by the final step."
             exit 0
           fi
           if [ -z "$GH_TOKEN" ]; then
-            echo "AUTOLAND_PAT not set — skipping PR open (working tree changes left uncommitted)."
-            if [ -n "$issue" ]; then
-              GH_TOKEN="${{ secrets.GITHUB_TOKEN }}" node -e 'import("./scripts/lib/issues.mjs").then(m=>m.unclaimIssue(Number(process.argv[1])))' "$issue" || true
-            fi
+            echo "AUTOLAND_PAT not set — skipping PR open (working tree changes left uncommitted). Claim released by the final step."
             exit 0
           fi
           # Append the run id so a same-day re-run can't collide on the branch (#55).
@@ -138,3 +132,32 @@ jobs:
             --body "Automated weekly drift sweep, consumed from an open \`drift\` issue. Bounded copy edits to stale static claims, and append-only addenda on drifted field notes (original prose preserved byte-for-byte by \`scripts/freshness/validate.mjs\`). Opened for auto-land review.${close_line}" \
             --label auto-land \
             --head "$BRANCH"
+          # Mark that a PR was opened, so the final self-heal step leaves the claim
+          # in place (the issue closes on MERGE via `Closes #<issue>`).
+          touch pr-opened.flag
+
+      # Self-heal: ALWAYS release the claim unless a PR was opened this run. Runs
+      # even when an earlier step (gather/draft/validate) failed — so a stuck
+      # `in-progress` label never blocks the queue; the drift issue is retried
+      # next run. Best-effort (|| true): never masks a genuine failure exit code,
+      # and the happy path (PR opened → pr-opened.flag present) skips the release
+      # so the issue closes on merge instead of being unclaimed.
+      - name: Release the claim if no PR was opened (self-heal)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f pr-opened.flag ]; then
+            echo "A PR was opened this run — leaving the claim (issue closes on merge)."
+            exit 0
+          fi
+          issue=""
+          if [ -f claim.json ]; then
+            issue="$(node -e 'try{const c=require("./claim.json");process.stdout.write(String(c.issue??""))}catch{process.stdout.write("")}')"
+          fi
+          if [ -z "$issue" ]; then
+            echo "No claimed issue to release."
+            exit 0
+          fi
+          echo "Releasing claim on #${issue} so it retries next run."
+          node -e 'import("./scripts/lib/issues.mjs").then(m=>m.unclaimIssue(Number(process.argv[1])))' "$issue" || true

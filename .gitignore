@@ -30,3 +30,6 @@ npm-debug.log*
 /seeds.json
 /notebook-raw.json
 /validated-seeds.json
+# Set by an actor after it opens a PR, so the self-heal step leaves the claim in
+# place (issue closes on merge). Must never land in a drift-actor `git add -A`.
+/pr-opened.flag
