@@ -25,7 +25,6 @@
     "@fontsource/space-grotesk": "^5.2.5",
     "@tailwindcss/vite": "^4.1.5",
     "astro": "^5.8.0",
-    "qrcode": "^1.5.4",
     "tailwindcss": "^4.1.5",
     "typescript": "^5.8.0",
     "vite": "^6.4.3"
