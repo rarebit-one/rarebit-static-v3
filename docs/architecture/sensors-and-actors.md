@@ -43,7 +43,7 @@ store, no cron coupling — the issue lifecycle *is* the state machine.
 
 The shared code for this lives in [`scripts/lib/issues.mjs`](../../scripts/lib/issues.mjs)
 — `buildMarker` / `parseMarker`, `dedupeBy`, `ensureLabel`, `emitIssue`,
-`listOpenIssues`, `claimIssue`, `closeIssue`.
+`listOpenIssues`, `claimIssue`, `unclaimIssue`, `closeIssue`.
 
 ## Label taxonomy (the type system)
 
@@ -52,11 +52,16 @@ sensors may produce it.
 
 | Label | Producer (sensor) | Consumer (actor) | Status |
 |-------|-------------------|------------------|--------|
-| `field-note-seed` | notebook scout | field-notes | **exists** |
+| `field-note-seed` | notebook scout | field-notes | **exists** (retrofitted onto `issues.mjs`, #56) |
 | `inquiry` | MCP server / inquiry form | (humans, in `rarebit-ops`) | **exists** |
-| `voice-proposal` | frontier-lab voice sensor | voice actor | planned |
-| `drift` | freshness sensor | drift actor | planned |
+| `voice-proposal` | voice sensor (`voice-sensor.yml`) | voice actor (`voice-actor.yml`) | **exists** (#56) |
+| `drift` | drift sensor (`drift-sensor.yml`) | drift actor (`drift-actor.yml`) | **exists** (#56) |
 | `task` | any sensor | a generic task runner | future / generic |
+
+`in-progress` is not a work-item type — it is the **claim** marker an actor adds
+to an open issue (any type) before it begins the slow work, so an overlapping run
+won't double-process it. `claimIssue` adds it; `unclaimIssue` removes it when an
+actor took an item but then no-op'd / the gate rejected, releasing it for retry.
 
 `inquiry` already lives in `rarebit-one/rarebit-ops` (opened by the MCP server
 and the inquiry form) — proof the pattern predates this doc; here it's a
@@ -115,30 +120,47 @@ query the *open* set, so the label needs no cleanup once closed.
 
 | Workflow / job | Role | Notes |
 |----------------|------|-------|
-| notebook (`scripts/notebook/`) | **sensor** | reads public activity → `field-note-seed` issues (gated by its `validate.mjs`) |
-| field-notes (`scripts/field-notes/`) | **actor** | consumes `field-note-seed` issues → publishes a note |
+| notebook (`scripts/notebook/`) | **sensor** | reads public activity → `field-note-seed` issues (gated by its `validate.mjs`); emits + dedups via `issues.mjs` (#56) |
+| field-notes (`scripts/field-notes/`) | **actor** | consumes `field-note-seed` issues (marker recovered via `parseMarker`) → publishes a note |
 | inquiry / MCP (`functions/packages/mcp/`) | **sensor** | inbound message → `inquiry` issue in `rarebit-ops` |
 | farm-feed (`scripts/farm-feed/`) | **telemetry sensor → bucket** | metrics stream → DO Spaces artifact (NOT issues — boundary #1) |
-| voice-evolution | **coupled sense + act** | senses *and* mutates voice in one job — a split candidate |
-| site-freshness | **coupled sense + act** | senses staleness *and* edits in one job — a split candidate |
+| voice-sensor (`scripts/voice/sense.mjs`) | **sensor** | frontier-lab signal → one deduped `voice-proposal` issue (#56) |
+| voice-actor (`scripts/voice/act.mjs`) | **actor** | claims a `voice-proposal` → existing draft + bounded-diff gate → `auto-land` PR (#56) |
+| drift-sensor (`scripts/freshness/sense.mjs`) | **sensor** | worktree capability signals → one deduped `drift` issue (#56) |
+| drift-actor (`scripts/freshness/act.mjs`) | **actor** | claims a `drift` → re-gather + existing draft + byte-for-byte gate → `auto-land` PR (#56) |
 | auto-land + review-verdict | **shared effect / quality rail** | the common landing + review lane all actors funnel through |
 
-## Next steps (describe only — not built here)
+## What was built (#56)
 
-Both coupled jobs above bundle sensing and acting in a single workflow. The plan
-is to **split** each into a sensor/actor pair communicating over the
-[`issues.mjs`](../../scripts/lib/issues.mjs) contract:
+The foundation (this doc + the `issues.mjs` contract) and all three realizations
+now exist:
 
-- **`voice-evolution` → `voice-sensor` + `voice-actor`.** The sensor detects a
-  warranted voice change and emits a `voice-proposal` issue (payload =
-  proposed change + grounding); the actor consumes it, applies the edit, and
-  closes.
-- **`site-freshness` → `drift-sensor` + `drift-actor`.** The sensor detects
-  stale content and emits a `drift` issue (payload = what's stale + why); the
-  actor consumes it, refreshes the page, and closes.
+- **notebook/field-notes — retrofitted.** `scripts/notebook/publish.mjs` (sensor)
+  and `scripts/field-notes/gather.mjs` (actor) dropped their inline `<!-- seed:{…} -->`
+  marker + dedup in favour of `issues.mjs` (`ensureLabel` / `listOpenIssues` /
+  `parseMarker` / `emitIssue`). Behaviour is unchanged: same `field-note-seed`
+  label, the marker TYPE token stays `seed` (so `buildMarker("seed", …)` is
+  byte-identical to the old inline marker and pre-existing open seeds still parse
+  and dedup), and the dedup key stays the primary grounding URL. Locked by
+  `scripts/notebook/publish.test.mjs`.
+- **`voice-evolution` → `voice-sensor` + `voice-actor`.** The sensor
+  (`scripts/voice/sense.mjs`, `voice-sensor.yml`) reads this week's public signal
+  and emits ONE deduped `voice-proposal` issue carrying that signal; it edits
+  nothing. The actor (`scripts/voice/act.mjs`, `voice-actor.yml`) claims the
+  issue, reconstructs the signal, runs the UNCHANGED `draft.mjs` + the #54
+  bounded-diff `validate.mjs`, and opens an `auto-land` PR that `Closes` the issue
+  on merge. A no-op / rejected gate releases the claim (`unclaimIssue`) for retry.
+- **`site-freshness` → `drift-sensor` + `drift-actor`.** The sensor
+  (`scripts/freshness/sense.mjs`, `drift-sensor.yml`) reads the worktree's
+  capability signals and emits ONE deduped `drift` issue. The actor
+  (`scripts/freshness/act.mjs`, `drift-actor.yml`) claims it, re-gathers fresh
+  worktree state, runs the UNCHANGED `draft.mjs` + the byte-for-byte `validate.mjs`,
+  and opens an `auto-land` PR that `Closes` the issue on merge; a no-op releases
+  the claim.
 
-The **first concrete step** is this foundation: the paradigm doc (here) and the
-shared `scripts/lib/issues.mjs` contract. The notebook/field-notes pair will be
-**retrofitted** onto `issues.mjs` next (replacing its inline `seed:` marker
-logic), and only then will the voice/freshness splits be built. All of that is
-additive to what exists today — this foundation changes no current behavior.
+Each split's gate is **reused verbatim** — the validators remain the sole
+pre-publish gates, the trust boundary holds (sensors gate before they emit; the
+voice/drift sensors carry only public, non-identifier signal), and farm-feed
+stays a bucket, never an issue (boundary #1). The new labels (`voice-proposal`,
+`drift`, `in-progress`) are documented in `scripts/autoland/enable.sh` and
+`ensureLabel`d at runtime so a missing label never errors.

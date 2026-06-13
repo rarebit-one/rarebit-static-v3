@@ -288,6 +288,28 @@ export function claimIssue(number) {
 }
 
 /**
+ * Release a claim: remove the `in-progress` label so the issue is an obvious
+ * open candidate again. An actor calls this when it claimed an issue but then
+ * did NOT complete the work (the gate rejected, or it was a benign no-op), so a
+ * later run picks it up cleanly. Idempotent and graceful — a missing label or no
+ * token is a no-op.
+ *
+ * @param {number} number
+ * @returns {boolean} true on success (or no-op).
+ */
+export function unclaimIssue(number) {
+  if (!hasToken()) return false;
+  const res = gh(["issue", "edit", String(number), "--remove-label", "in-progress"]);
+  if (!res.ok) {
+    // `--remove-label` on an issue that doesn't have the label is a soft failure;
+    // log but don't treat it as fatal — the goal state (no in-progress) holds.
+    console.log(`issues: unclaim no-op for #${number} — ${res.stderr.trim()}`);
+    return false;
+  }
+  return true;
+}
+
+/**
  * Close an issue as done, optionally leaving a closing comment. Closed = the
  * actor completed the work. (On FAILURE, an actor should instead leave the
  * issue OPEN and comment, so it retries next run — see the doc's lifecycle.)

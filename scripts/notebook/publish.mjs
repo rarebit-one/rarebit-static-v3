@@ -1,34 +1,51 @@
 // Notebook pipeline · step 4 of 4 — PUBLISH (network; NOT the gate).
 //
-// Turns the validated idea-seeds into PUBLIC GitHub issues in THIS repo,
-// labeled `field-note-seed`. This replaces the old private DO Spaces notebook
-// object: each open issue is a pending seed (open = candidate, closed = used),
-// so the issue lifecycle IS the retention mechanism — no rolling file, no
-// SigV4, no bucket. Seeds are sanitized, public-work-derived angles, so a
-// public issue is safe and on-brand.
+// The notebook is a SENSOR in the sensors/actors paradigm (see
+// docs/architecture/sensors-and-actors.md): it turns validated idea-seeds into
+// PUBLIC GitHub issues in THIS repo, labeled `field-note-seed`. Each open issue
+// is a pending seed (open = candidate, closed = used), so the issue lifecycle IS
+// the retention mechanism — no rolling file, no SigV4, no bucket. Seeds are
+// sanitized, public-work-derived angles, so a public issue is safe and on-brand.
 //
 // This step runs AFTER validate.mjs — no seed reaches an issue without first
-// clearing the leak gate. publish itself does no sanitization; it only creates
-// issues from already-validated seeds, deduping against open ones.
+// clearing the leak gate (the queue is the trust boundary: gate first, emit
+// second). publish itself does no sanitization; it only creates issues from
+// already-validated seeds, deduping against open ones.
 //
-// Each created issue embeds a hidden round-trip marker in its body:
-//   <!-- seed:{"angle":"…","grounding":[…]} -->
-// so field-notes/gather.mjs can recover the structured seed later.
+// RETROFIT (issue #56): this used to hand-roll its `<!-- seed:{json} -->` marker
+// and its open-issue dedup inline. It now rides the shared contract in
+// scripts/lib/issues.mjs (ensureLabel / listOpenIssues / parseMarker / dedupeBy /
+// emitIssue), the same module the voice + drift sensors use. BEHAVIOUR IS
+// UNCHANGED: the label stays `field-note-seed`, and the marker stays
+// `<!-- seed:{"angle":…,"grounding":[…]} -->` (marker TYPE = "seed", distinct
+// from the label) — so seeds filed before this change still parse and dedup
+// exactly as before. The dedup key is still the PRIMARY grounding URL.
 //
-// Dedup: skip a seed whose PRIMARY grounding URL already appears in an open
-// seed issue (parsed from the existing markers, with a text fallback).
+// On the dedup rule specifically: a candidate is skipped iff its PRIMARY
+// grounding URL (grounding[0]) already appears among the grounding URLs of the
+// open seed queue OR an earlier-accepted candidate in this same run. That is the
+// "check the primary, but remember ALL grounding of anything filed" asymmetry the
+// inline loop had — it is intentionally NOT a plain dedupeBy (whose single keyFn
+// checks and records the same keys), so we keep the explicit running set here and
+// reserve dedupeBy for symmetric callers. The contract still backs every other
+// step: ensureLabel, listOpenIssues, parseMarker, and emitIssue.
 //
 // Graceful: missing validated-seeds.json or no GitHub token → no-op (exit 0).
 // Never crash the workflow.
 //
-// Input: argv[2] (default ./validated-seeds.json). Uses the `gh` CLI with
-// GH_TOKEN / GITHUB_TOKEN from the environment.
+// Input: argv[2] (default ./validated-seeds.json). The IO helpers use the `gh`
+// CLI with GH_TOKEN / GITHUB_TOKEN from the environment.
 
 import { existsSync, readFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
+import { emitIssue, ensureLabel, listOpenIssues, parseMarker } from "../lib/issues.mjs";
 
 const IN = process.argv[2] ?? "validated-seeds.json";
 const LABEL = "field-note-seed";
+// The marker TYPE token is "seed", NOT the label. This is deliberate and
+// load-bearing: open seed issues filed before the retrofit carry
+// `<!-- seed:{…} -->`, so we must keep emitting + parsing that exact token for
+// them to round-trip and dedup. buildMarker("seed", …) reproduces it byte-for-byte.
+const MARKER_TYPE = "seed";
 const TOKEN = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
 
 if (!existsSync(IN)) {
@@ -40,20 +57,6 @@ if (!TOKEN) {
   process.exit(0);
 }
 
-// Run a `gh` subcommand with the token in env. Returns { ok, stdout, stderr }.
-function gh(args, { capture = true } = {}) {
-  const res = spawnSync("gh", args, {
-    encoding: "utf8",
-    env: { ...process.env, GH_TOKEN: TOKEN },
-  });
-  return {
-    ok: res.status === 0,
-    stdout: capture ? (res.stdout ?? "") : "",
-    stderr: res.stderr ?? "",
-    status: res.status,
-  };
-}
-
 const parsed = JSON.parse(readFileSync(IN, "utf8"));
 const seeds = Array.isArray(parsed?.seeds) ? parsed.seeds : [];
 if (seeds.length === 0) {
@@ -61,71 +64,35 @@ if (seeds.length === 0) {
   process.exit(0);
 }
 
-// Ensure the label exists (idempotent — ignore "already exists" failures).
-gh([
-  "label",
-  "create",
-  LABEL,
-  "--color",
-  "C5DEF5",
-  "--description",
-  "Candidate angle for a future field note (farm-scouted)",
-]);
+// Ensure the label exists (idempotent). Same color/description as before.
+ensureLabel(LABEL, "C5DEF5", "Candidate angle for a future field note (farm-scouted)");
 
-// Collect grounding URLs already represented by OPEN seed issues, so we don't
-// file a near-duplicate. We parse the hidden marker first; if it's missing or
-// unparseable, fall back to scraping URLs from the issue body text.
+// Read the OPEN seed queue via the shared contract, then seed the dedup set with
+// every grounding URL already represented. listOpenIssues returns each issue's
+// raw body; we recover grounding from the `seed:` marker (parseMarker with the
+// correct MARKER_TYPE), falling back to scraping URLs from the body text when the
+// marker is missing/unparseable — exactly the old fallback path.
+const open = listOpenIssues(LABEL);
+if (open.length >= 100) {
+  console.log(
+    "::warning::publish: hit the 100-issue dedup cap — open seeds beyond 100 are not checked for duplicates. Triage/close stale seeds or add pagination."
+  );
+}
+
 const existingUrls = new Set();
-const list = gh([
-  "issue",
-  "list",
-  "--label",
-  LABEL,
-  "--state",
-  "open",
-  "--json",
-  "number,body",
-  "--limit",
-  "100",
-]);
-if (list.ok) {
-  let issues = [];
-  try {
-    issues = JSON.parse(list.stdout || "[]");
-  } catch {
-    issues = [];
-  }
-  // The listing is capped at 100 (no pagination). Beyond that, older open seed
-  // issues fall off the page and escape dedup silently — a duplicate could slip
-  // through. Warn loudly so it's visible; full pagination is tracked separately.
-  if (issues.length >= 100) {
-    console.log(
-      "::warning::publish: hit the 100-issue dedup cap — open seeds beyond 100 are not checked for duplicates. Triage/close stale seeds or add pagination."
-    );
-  }
-  for (const issue of issues) {
-    const body = String(issue?.body ?? "");
-    const marker = body.match(/<!--\s*seed:(\{[\s\S]*?\})\s*-->/);
-    let added = false;
-    if (marker) {
-      try {
-        const seed = JSON.parse(marker[1]);
-        for (const u of Array.isArray(seed?.grounding) ? seed.grounding : []) {
-          if (typeof u === "string") existingUrls.add(u);
-        }
-        added = true;
-      } catch {
-        // fall through to text scrape
-      }
+for (const issue of open) {
+  const m = parseMarker(issue.body, MARKER_TYPE);
+  if (m && Array.isArray(m.data?.grounding)) {
+    for (const u of m.data.grounding) {
+      if (typeof u === "string") existingUrls.add(u);
     }
-    if (!added) {
-      for (const u of body.match(/https?:\/\/[^\s)\]<>"']+/gi) ?? []) {
-        existingUrls.add(u.replace(/[.,;:]+$/, ""));
-      }
+  } else {
+    // Marker absent/unparseable — scrape URLs from the body text, matching the
+    // legacy fallback (trailing punctuation trimmed).
+    for (const u of issue.body.match(/https?:\/\/[^\s)\]<>"']+/gi) ?? []) {
+      existingUrls.add(u.replace(/[.,;:]+$/, ""));
     }
   }
-} else {
-  console.log("publish: could not list existing seed issues — proceeding without dedup.");
 }
 
 const today = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10); // YYYY-MM-DD (SGT)
@@ -139,7 +106,9 @@ for (const seed of seeds) {
     (u) => typeof u === "string"
   );
 
-  // DEDUP — skip if the primary grounding URL is already on an open seed issue.
+  // DEDUP — skip if the PRIMARY grounding URL is already on an open seed issue (or
+  // an earlier seed accepted this run). Identical rule to the inline version:
+  // check the primary, but remember ALL grounding of anything filed.
   const primary = grounding[0];
   if (primary && existingUrls.has(primary)) {
     console.log(`publish: skipping (dup of an open seed) — ${angle.slice(0, 60)}`);
@@ -151,7 +120,6 @@ for (const seed of seeds) {
   const groundingList = grounding.length
     ? grounding.map((u) => `- ${u}`).join("\n")
     : "_No public links — a generic, anonymized observation._";
-  const marker = JSON.stringify({ angle, grounding });
   const body = [
     angle,
     "",
@@ -160,20 +128,26 @@ for (const seed of seeds) {
     groundingList,
     "",
     `_Auto-scouted by the farm's notebook on ${today}. A candidate angle for a future field note — edit, comment, or close freely._`,
-    "",
-    `<!-- seed:${marker} -->`,
   ].join("\n");
 
-  const res = gh(["issue", "create", "--label", LABEL, "--title", title, "--body", body], {
-    capture: true,
+  // emitIssue appends `<!-- seed:{"angle":…,"grounding":[…]} -->` via
+  // buildMarker(MARKER_TYPE, data) — byte-identical to the old inline marker, so
+  // the field-notes actor recovers the seed exactly as before. The label is
+  // ensured a second time by emitIssue (idempotent); harmless.
+  const num = emitIssue({
+    label: LABEL,
+    title,
+    body,
+    type: MARKER_TYPE,
+    data: { angle, grounding },
   });
-  if (res.ok) {
+  if (num) {
     created += 1;
     // Record the new seed's grounding so later seeds in this run dedup too.
     for (const u of grounding) existingUrls.add(u);
-    console.log(`publish: created issue — ${title}`);
+    console.log(`publish: created issue #${num} — ${title}`);
   } else {
-    console.log(`publish: issue create failed (${res.status}) — ${res.stderr.trim()}`);
+    console.log(`publish: issue create failed — ${title}`);
   }
 }
 

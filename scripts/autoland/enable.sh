@@ -37,10 +37,23 @@ case "$ans" in
 esac
 
 # ---------------------------------------------------------------------------
-# 1. Labels: the control surface for the sweeper.
-#    auto-land   — opt a PR INTO auto-merge.
-#    hold        — temporary pause (e.g. mid-discussion).
-#    no-auto-land— permanent opt-out for a specific PR.
+# 1. Labels: the control surface for the sweeper, plus the sensors/actors queue.
+#
+#    Auto-land control (the sweeper reads these):
+#      auto-land    — opt a PR INTO auto-merge.
+#      hold         — temporary pause (e.g. mid-discussion).
+#      no-auto-land — permanent opt-out for a specific PR.
+#
+#    Sensors/actors work-queue types (issue #56 — see
+#    docs/architecture/sensors-and-actors.md). Each label IS a work-item type; one
+#    actor owns each. The sensor/actor scripts also ensureLabel these at runtime
+#    (so a missing label never errors — #55 hardening), but we create them here so
+#    the queue's type system is bootstrapped in one place and the colors are
+#    intentional. Keep the colors in sync with the ensureLabel calls in the scripts.
+#      voice-proposal — voice sensor → voice actor (a proposed bounded VOICE.md change).
+#      drift          — drift sensor → drift actor (a warranted site-freshness sweep).
+#      in-progress    — an actor has CLAIMED an issue; prevents double-processing.
+#    (field-note-seed is created by the notebook publisher at runtime, not here.)
 # ---------------------------------------------------------------------------
 create_label() {
   local name="$1" color="$2" desc="$3"
@@ -57,6 +70,13 @@ echo "-- Labels --"
 create_label "auto-land"    "0e8a16" "Opt this PR into gated auto-merge once green + review-clear"
 create_label "hold"         "fbca04" "Temporarily pause auto-land for this PR"
 create_label "no-auto-land" "b60205" "Never auto-land this PR (permanent opt-out)"
+
+# Sensors/actors work-queue types (issue #56). Colors MUST match the ensureLabel
+# calls in the producer/consumer scripts (scripts/voice/*, scripts/freshness/*,
+# scripts/lib/issues.mjs claimIssue) so a runtime ensureLabel doesn't re-color them.
+create_label "voice-proposal" "5319e7" "Proposed bounded VOICE.md change (voice sensor → voice actor)"
+create_label "drift"          "d93f0b" "A weekly site-freshness drift sweep is warranted (drift sensor → actor)"
+create_label "in-progress"    "fbca04" "Claimed by an actor — being processed"
 
 # ---------------------------------------------------------------------------
 # 2. Branch protection on main.
