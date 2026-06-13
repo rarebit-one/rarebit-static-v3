@@ -18,6 +18,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { voiceHeader } from "../lib/voice.mjs";
 import { callLLM, hasOpenAIKey } from "../lib/llm.mjs";
+import { resolveUsedSeeds } from "./seeds.mjs";
 
 const IN = process.argv[2] ?? "facts.json";
 const OUT = process.argv[3] ?? "draft.json";
@@ -97,12 +98,17 @@ for (const field of required) {
   }
 }
 
-// Normalize the OPTIONAL usedSeedIssues to a clean array of positive integers
-// (issue numbers the draft drew on). The workflow closes these after publish;
-// anything non-numeric is dropped so a malformed value can't break that step.
-const usedSeedIssues = (Array.isArray(draft.usedSeedIssues) ? draft.usedSeedIssues : [])
-  .map((n) => Number(n))
-  .filter((n) => Number.isInteger(n) && n > 0);
+// Resolve which seed issues this note actually used — DETERMINISTICALLY, by
+// matching each seed's grounding URLs against the published body, rather than
+// trusting the model's self-reported `usedSeedIssues` (gpt-4o routinely returns
+// an empty array even when it drew on a seed, so seeds never closed). The
+// model's claim is unioned in but filtered to seeds it was actually given.
+// The workflow closes these after publish. See scripts/field-notes/seeds.mjs.
+const usedSeedIssues = resolveUsedSeeds({
+  seeds: facts.notebook,
+  body: draft.body,
+  modelClaimed: draft.usedSeedIssues,
+});
 draft.usedSeedIssues = usedSeedIssues;
 
 writeFileSync(OUT, JSON.stringify(draft, null, 2));
