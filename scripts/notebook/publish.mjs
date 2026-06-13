@@ -95,6 +95,14 @@ if (list.ok) {
   } catch {
     issues = [];
   }
+  // The listing is capped at 100 (no pagination). Beyond that, older open seed
+  // issues fall off the page and escape dedup silently — a duplicate could slip
+  // through. Warn loudly so it's visible; full pagination is tracked separately.
+  if (issues.length >= 100) {
+    console.log(
+      "::warning::publish: hit the 100-issue dedup cap — open seeds beyond 100 are not checked for duplicates. Triage/close stale seeds or add pagination."
+    );
+  }
   for (const issue of issues) {
     const body = String(issue?.body ?? "");
     const marker = body.match(/<!--\s*seed:(\{[\s\S]*?\})\s*-->/);

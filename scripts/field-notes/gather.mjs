@@ -95,6 +95,15 @@ async function fetchNotebookSeeds() {
   }
   if (!Array.isArray(issues)) return null;
 
+  // The listing is capped at per_page=100 (no pagination). Beyond that, older
+  // open seed issues fall off the page and are silently invisible to the
+  // drafter. Warn loudly so it's visible; full pagination is tracked separately.
+  if (issues.length >= 100) {
+    console.log(
+      "::warning::gather: hit the 100-issue seed cap — open seeds beyond 100 are not read. Triage/close stale seeds or add pagination."
+    );
+  }
+
   const seeds = [];
   for (const issue of issues) {
     // The issues endpoint also returns PRs; skip those.
