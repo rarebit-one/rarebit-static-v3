@@ -6,9 +6,12 @@
 // and URLs are read here and NEVER written to the output — this is the strip
 // half of the "digest sandwich". The LLM (step 2) only ever sees this file.
 //
-// Also emits a `blocklist` (private repo names + org member logins) that the
-// validator (step 3) uses to hard-fail if any of them leak into the phrased
-// output.
+// Also emits a `blocklist` (private repo names + org member logins + the
+// actor/commit-author logins seen in the private run data) that the validator
+// (step 3) uses to hard-fail if any of them leak into the phrased output.
+// Repos, members, and per-repo runs are all fully paginated so identifiers
+// past page 1 still reach the blocklist; org members stays best-effort (a
+// metadata-only PAT may 403/empty), with run actors as the fallback source.
 //
 // Env: FEED_GITHUB_PAT (fine-grained, read-only Actions + metadata on
 // rarebit-one private repos). Missing token → exit 0 with a notice so the
@@ -22,6 +25,7 @@ const ORG = "rarebit-one";
 const TOKEN = process.env.FEED_GITHUB_PAT;
 const OUT = process.argv[2] ?? "sanitized.json";
 const MAX_EVENTS = 40;
+const MAX_PAGES = 50; // safety cap: ~5k items/list — far beyond the org's real size
 const TZ_OFFSET = "+08:00"; // SGT — the farm runs on Singapore time
 
 if (!TOKEN) {
@@ -43,8 +47,10 @@ function yesterdayWindow() {
   };
 }
 
-async function gh(path) {
-  const response = await fetch(`https://api.github.com${path}`, {
+// Single fetch against the GitHub API. Returns the raw Response so callers can
+// read the Link header for pagination; `fetchAllPages` checks `.ok`.
+async function ghRaw(path) {
+  return fetch(path.startsWith("http") ? path : `https://api.github.com${path}`, {
     headers: {
       Authorization: `Bearer ${TOKEN}`,
       Accept: "application/vnd.github+json",
@@ -52,8 +58,42 @@ async function gh(path) {
       "User-Agent": "rarebit-farm-feed",
     },
   });
-  if (!response.ok) throw new Error(`GitHub ${path} → ${response.status}`);
-  return response.json();
+}
+
+// Parse the rel="next" URL out of a GitHub Link header, if present.
+function nextLink(linkHeader) {
+  if (!linkHeader) return null;
+  for (const part of linkHeader.split(",")) {
+    const m = part.match(/<([^>]+)>\s*;\s*rel="next"/);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+// Fetch ALL pages of a paginated list endpoint, following the Link rel="next"
+// header. `path` should already carry per_page (=100). Stops at MAX_PAGES as a
+// safety cap; logs a warning (with `label`) if the cap is hit so we never
+// silently assume full coverage. `pick` extracts the array from each page's
+// body (GitHub returns a bare array for repos/members, an object with
+// `workflow_runs` for runs). Throws on a non-OK page (callers may .catch()).
+async function fetchAllPages(path, { label, pick = (b) => b } = {}) {
+  const items = [];
+  let url = path;
+  let page = 0;
+  while (url) {
+    if (page >= MAX_PAGES) {
+      console.log(`gather: WARNING ${label ?? path} hit page cap (${MAX_PAGES}) — list may be truncated`);
+      break;
+    }
+    const response = await ghRaw(url);
+    if (!response.ok) throw new Error(`GitHub ${url} → ${response.status}`);
+    const body = await response.json();
+    const chunk = pick(body);
+    if (Array.isArray(chunk)) items.push(...chunk);
+    url = nextLink(response.headers.get("link"));
+    page += 1;
+  }
+  return items;
 }
 
 // Workflow-name → category. Done HERE so names never leave this script.
@@ -70,31 +110,35 @@ function categorize(name) {
 
 async function main() {
   const { date, startUtc, endUtc } = yesterdayWindow();
-  const repos = await gh(`/orgs/${ORG}/repos?type=private&per_page=100`);
-  const members = await gh(`/orgs/${ORG}/members?per_page=100`).catch(() => []);
 
-  // The blocklist is defense-in-depth (the LLM never sees raw names anyway),
-  // but flag truncation so we don't assume full coverage. >100 repos/members,
-  // or an empty members list from a metadata-only PAT, means some identifiers
-  // aren't on the blocklist — the validator still gates URLs/numbers/emails.
-  if (repos.length === 100) console.log("gather: WARNING repos hit per_page=100 — blocklist may be incomplete");
-  if (Array.isArray(members) && members.length === 100) console.log("gather: WARNING members hit per_page=100 — blocklist may be incomplete");
-  if (!Array.isArray(members) || members.length === 0) console.log("gather: note — no org members fetched (PAT scope?); logins absent from blocklist");
+  // Repos + members: fully paginated so identifiers past page 1 still reach the
+  // blocklist. Members stays best-effort (a metadata-only PAT may 403/empty) —
+  // so it is NO LONGER the sole source of logins (see actorLogins below).
+  const repos = await fetchAllPages(`/orgs/${ORG}/repos?type=private&per_page=100`, { label: "repos" });
+  const members = await fetchAllPages(`/orgs/${ORG}/members?per_page=100`, { label: "members" }).catch(() => []);
 
-  const blocklist = [
-    ...repos.map((r) => r.name),
-    ...repos.map((r) => r.full_name),
-    ...(Array.isArray(members) ? members.map((m) => m.login) : []),
-  ];
+  if (!Array.isArray(members) || members.length === 0) {
+    console.log("gather: note — no org members fetched (PAT scope?); deriving logins from run actors instead");
+  }
+
+  // Logins seen as workflow actors / triggering commit authors in the private
+  // run data we already fetch. This backfills the blocklist when /members is
+  // empty, and catches outside collaborators who aren't org members. These are
+  // read HERE and never written downstream — only the blocklist (used locally
+  // by validate) carries them, and only totals/events leave for the LLM.
+  const actorLogins = new Set();
 
   const created = `${date}T00:00:00${TZ_OFFSET}..${date}T23:59:59${TZ_OFFSET}`;
   const raw = [];
   for (const repo of repos) {
-    const data = await gh(
-      `/repos/${repo.full_name}/actions/runs?created=${encodeURIComponent(created)}&per_page=100`
-    ).catch(() => null);
-    if (!data?.workflow_runs) continue;
-    for (const run of data.workflow_runs) {
+    const runs = await fetchAllPages(
+      `/repos/${repo.full_name}/actions/runs?created=${encodeURIComponent(created)}&per_page=100`,
+      { label: `runs:${repo.full_name}`, pick: (b) => b?.workflow_runs ?? [] }
+    ).catch(() => []);
+    for (const run of runs) {
+      for (const login of [run.actor?.login, run.triggering_actor?.login, run.head_commit?.author?.name]) {
+        if (login) actorLogins.add(String(login));
+      }
       const at = new Date(run.run_started_at ?? run.created_at);
       if (at < startUtc || at > endUtc) continue;
       if (run.status !== "completed") continue;
@@ -105,6 +149,18 @@ async function main() {
       });
     }
   }
+
+  // Defense-in-depth blocklist: private repo names + org member logins + the
+  // actor/author logins derived above. The validator still gates URLs / emails /
+  // @handles / fabricated numbers independently; this just widens coverage.
+  const blocklist = [
+    ...new Set([
+      ...repos.map((r) => r.name),
+      ...repos.map((r) => r.full_name),
+      ...(Array.isArray(members) ? members.map((m) => m.login) : []),
+      ...actorLogins,
+    ]),
+  ];
 
   raw.sort((a, b) => a.at.localeCompare(b.at));
 
