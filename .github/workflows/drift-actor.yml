@@ -125,6 +125,7 @@ jobs:
           # Scratch artifacts are gitignored, so -A only stages the real source edits.
           git add -A
           git commit -m "Site freshness: weekly drift sweep"
+          git push --set-upstream origin "$BRANCH"
           # Ensure the `auto-land` label exists so `gh pr create --label` can't fail
           # the run if the label was never bootstrapped (enable.sh) (#55).
           gh label create auto-land --color "0E8A16" --description "Opt this PR into gated auto-merge once green + review-clear" --force || true
@@ -135,4 +136,5 @@ jobs:
           gh pr create \
             --title "Site freshness: weekly drift sweep" \
             --body "Automated weekly drift sweep, consumed from an open \`drift\` issue. Bounded copy edits to stale static claims, and append-only addenda on drifted field notes (original prose preserved byte-for-byte by \`scripts/freshness/validate.mjs\`). Opened for auto-land review.${close_line}" \
-            --label auto-land
+            --label auto-land \
+            --head "$BRANCH"
