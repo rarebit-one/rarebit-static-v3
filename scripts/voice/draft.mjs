@@ -26,6 +26,12 @@ const VOICE_PATH = process.argv[2] ?? "VOICE.md";
 const SIGNAL_PATH = process.argv[3] ?? "signal.json";
 const OUT = process.argv[4] ?? "proposal.json";
 
+// Mirror of MAX_CHANGED_LINES in validate.mjs — the bounded-diff ceiling the
+// drafter must stay under. Kept here so the prompt can state the exact budget;
+// if you change it there, change it here. Keeping the two in sync is what makes
+// the model's instructions match the gate that judges its output.
+const MAX_CHANGED_LINES = 25;
+
 if (!hasOpenAIKey()) {
   console.log("draft: OPENAI_API_KEY not set — skipping (graceful no-op).");
   process.exit(0);
@@ -48,7 +54,7 @@ const today = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10); //
 
 const system = `${voiceHeader()}
 
-You are the farm's VOICE STEWARD. Your job is to keep VOICE.md — the canonical voice of rarebit.one — fresh and true, evolving it in SMALL, bounded steps. You tighten; you do not rewrite.`;
+You are the farm's VOICE STEWARD. Your job is to keep VOICE.md — the canonical voice of rarebit.one — fresh and true, evolving it in SMALL, bounded steps. You are surgical: you change at most a few lines, you copy everything else through verbatim, you ground every claim in the facts you are given, and you emit only the minimal edit. You tighten; you do not rewrite. An over-ambitious proposal is rejected outright and wastes the week, so err on the side of the smallest change that lands.`;
 
 const prompt = `Here is the CURRENT, full VOICE.md:
 
@@ -67,13 +73,23 @@ Propose a SMALL, surgical evolution of VOICE.md. Return STRICT JSON only — no 
   "changelog": "<one dated, bounded entry — one or two sentences describing the nudge, starting with the date ${today}>"
 }
 
-Hard rules for the proposal:
-- Make ONE small change: tighten a phrase, adjust a lexicon entry, or sharpen the SUBTLE self-awareness so it reflects where AI is heading this week. Do NOT rewrite wholesale; the diff must be a handful of lines.
+This is the most important constraint, and it is enforced by an automated gate that will REJECT your proposal and discard it if you exceed it:
+
+>>> LINE BUDGET <<<
+A downstream validator diffs the current VOICE.md against your "voiceMd" (the changelog block excluded) and counts changed lines. Each line you alter counts TWICE: once for the old line removed, once for the new line added. The hard ceiling is ${MAX_CHANGED_LINES} changed lines, which means you may rewrite AT MOST a handful of lines — realistically ONE to FIVE lines of actual prose. If you reword more than that, the whole proposal is thrown away and the voice does not evolve at all this week. A tiny, accepted nudge beats an ambitious, rejected one.
+
+How to stay inside the budget — follow this literally:
+- Reproduce the CURRENT VOICE.md in "voiceMd" BYTE-FOR-BYTE — same headings, same wording, same whitespace, same blank lines, same markers — and change ONLY the few characters of the single edit. Treat every line you are not deliberately editing as frozen; copy it through unchanged. Do NOT "improve", re-flow, re-wrap, re-punctuate, or re-order any other line.
+- Make exactly ONE conceptual edit, the smallest that lands this week's signal: tighten a single phrase, swap or add ONE word in the Lexicon, or sharpen ONE self-aware line. Not several edits; one.
+- Do not add, remove, split, merge, or reorder lines except as the single edit strictly requires. Keep section order and line breaks identical. Prefer an in-place word swap over inserting a new sentence.
+- If this week's public signal does not clearly motivate a change, make the most minimal possible touch (e.g. one tightened word). Never pad the diff to look busy.
+
+Other hard rules (the gate also enforces these):
 - Preserve, verbatim and in place, every marker line: "<!-- VOICE-HEADER:START -->", "<!-- VOICE-HEADER:END -->", "<!-- VOICE-CHANGELOG:START -->", "<!-- VOICE-CHANGELOG:END -->". Keep the document structure (headings, sections) intact.
 - Keep ALL hard invariants in the VOICE-HEADER: never name or describe a client/product/person/private repo; no hype or marketing adjectives, no exclamation marks, no emoji; British/neutral spelling; ground every claim in the facts. Do not weaken or remove any of these.
 - Self-awareness stays SUBTLE — no gimmicks, no "beep boop", no "as an AI", no excessive fourth-wall breaks.
-- Do NOT introduce any external URL, email, @handle, or company name into the VOICE-HEADER block — it must stay source-free.
-- The "voiceMd" value must be the complete file content (it replaces VOICE.md entirely). Do NOT pre-edit the changelog block yourself — leave the existing changelog entries exactly as they are; the pipeline prepends your new entry. The changelog string you return is that single new entry, beginning with "${today} — ".`;
+- Do NOT introduce any external URL, email, @handle, or company name into the VOICE-HEADER block — it must stay source-free. Ground the edit only in the facts above; invent nothing.
+- The "voiceMd" value must be the complete file content (it replaces VOICE.md entirely). Do NOT pre-edit the changelog block yourself — leave the existing changelog entries exactly as they are, byte-for-byte; the pipeline prepends your new entry. The changelog string you return is that single new entry, beginning with "${today} — ", one or two sentences, source-free.`;
 
 let text;
 try {
