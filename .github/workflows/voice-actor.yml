@@ -80,7 +80,7 @@ jobs:
           fi
           node scripts/voice/validate.mjs VOICE.md proposal.json VOICE.md
 
-      - name: Open auto-land PR (if the voice changed) or release the claim
+      - name: Open auto-land PR (if the voice changed)
         env:
           GH_TOKEN: ${{ secrets.AUTOLAND_PAT }}
         run: |
@@ -91,20 +91,12 @@ jobs:
           fi
 
           if [ -z "$(git status --porcelain VOICE.md)" ]; then
-            echo "VOICE.md unchanged (no proposal, thin signal, or gate rejected)."
-            # Release the claim so the open proposal is retried next run. Use the
-            # built-in token here (not the PAT, which may be unset).
-            if [ -n "$issue" ]; then
-              GH_TOKEN="${{ secrets.GITHUB_TOKEN }}" node -e 'import("./scripts/lib/issues.mjs").then(m=>m.unclaimIssue(Number(process.argv[1])))' "$issue" || true
-            fi
+            echo "VOICE.md unchanged (no proposal, thin signal, or gate rejected) — no PR. Claim released by the final step."
             exit 0
           fi
           if [ -z "$GH_TOKEN" ]; then
-            echo "AUTOLAND_PAT not set — voice evolved locally but cannot open a PR. No-op."
+            echo "AUTOLAND_PAT not set — voice evolved locally but cannot open a PR. No-op. Claim released by the final step."
             git checkout -- VOICE.md
-            if [ -n "$issue" ]; then
-              GH_TOKEN="${{ secrets.GITHUB_TOKEN }}" node -e 'import("./scripts/lib/issues.mjs").then(m=>m.unclaimIssue(Number(process.argv[1])))' "$issue" || true
-            fi
             exit 0
           fi
           # Append the run id so a same-day re-run can't collide on the branch (#55).
@@ -129,3 +121,32 @@ jobs:
             --label auto-land \
             --base main \
             --head "$branch"
+          # Mark that a PR was opened, so the final self-heal step leaves the claim
+          # in place (the issue closes on MERGE via `Closes #<issue>`).
+          touch pr-opened.flag
+
+      # Self-heal: ALWAYS release the claim unless a PR was opened this run. Runs
+      # even when an earlier step (draft/validate) failed or rejected — so a stuck
+      # `in-progress` label never blocks the queue; the proposal is retried next
+      # run. Best-effort (|| true): never masks a genuine failure exit code, and
+      # the happy path (PR opened → pr-opened.flag present) skips the release so
+      # the issue closes on merge instead of being unclaimed.
+      - name: Release the claim if no PR was opened (self-heal)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f pr-opened.flag ]; then
+            echo "A PR was opened this run — leaving the claim (issue closes on merge)."
+            exit 0
+          fi
+          issue=""
+          if [ -f claim.json ]; then
+            issue="$(node -e 'try{const c=require("./claim.json");process.stdout.write(String(c.issue??""))}catch{process.stdout.write("")}')"
+          fi
+          if [ -z "$issue" ]; then
+            echo "No claimed issue to release."
+            exit 0
+          fi
+          echo "Releasing claim on #${issue} so it retries next run."
+          node -e 'import("./scripts/lib/issues.mjs").then(m=>m.unclaimIssue(Number(process.argv[1])))' "$issue" || true

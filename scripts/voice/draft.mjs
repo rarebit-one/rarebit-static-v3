@@ -19,6 +19,7 @@
 //         shape { voiceMd, changelog }
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { voiceHeader } from "../lib/voice.mjs";
 import { callLLM, hasOpenAIKey } from "../lib/llm.mjs";
 
@@ -26,12 +27,53 @@ const VOICE_PATH = process.argv[2] ?? "VOICE.md";
 const SIGNAL_PATH = process.argv[3] ?? "signal.json";
 const OUT = process.argv[4] ?? "proposal.json";
 
+const C_START = "<!-- VOICE-CHANGELOG:START -->";
+const C_END = "<!-- VOICE-CHANGELOG:END -->";
+
+/**
+ * Deterministically restore the protected changelog block.
+ *
+ * validate.mjs (check 6) REJECTS any proposal whose changelog block (the text
+ * between the VOICE-CHANGELOG markers) differs from the current VOICE.md's — the
+ * pipeline, not the drafter, prepends the new entry. The model is told to leave
+ * that block untouched, but gpt-4o sometimes reword it anyway, which trips the
+ * gate and wastes the whole run. We don't loosen the gate; instead we GUARANTEE
+ * the input satisfies it: copy the current file's changelog block (markers
+ * included) verbatim over whatever the model produced. The model's body nudge
+ * (everything outside this block) is preserved and still judged by the
+ * bounded-diff gate; only its changelog meddling is silently discarded.
+ *
+ * If either side is missing a marker block, the proposed text is returned
+ * unchanged — validate.mjs's structure check (1) / changelog check (6) then
+ * surface the real problem rather than this helper masking it.
+ *
+ * @param {string} proposedVoiceMd The model's full proposed VOICE.md.
+ * @param {string} currentVoiceMd  The current canonical VOICE.md.
+ * @returns {string} proposedVoiceMd with its changelog block reset to current's.
+ */
+export function restoreChangelogBlock(proposedVoiceMd, currentVoiceMd) {
+  const cur = String(currentVoiceMd ?? "");
+  const pa = String(proposedVoiceMd ?? "").indexOf(C_START);
+  const pb = String(proposedVoiceMd ?? "").indexOf(C_END);
+  const ca = cur.indexOf(C_START);
+  const cb = cur.indexOf(C_END);
+  // Either block malformed → leave the proposal as-is for the gate to judge.
+  if (pa === -1 || pb === -1 || pb < pa) return String(proposedVoiceMd ?? "");
+  if (ca === -1 || cb === -1 || cb < ca) return String(proposedVoiceMd ?? "");
+  const currentBlockInner = cur.slice(ca + C_START.length, cb);
+  const p = String(proposedVoiceMd);
+  return (
+    p.slice(0, pa + C_START.length) + currentBlockInner + p.slice(pb)
+  );
+}
+
 // Mirror of MAX_CHANGED_LINES in validate.mjs — the bounded-diff ceiling the
 // drafter must stay under. Kept here so the prompt can state the exact budget;
 // if you change it there, change it here. Keeping the two in sync is what makes
 // the model's instructions match the gate that judges its output.
 const MAX_CHANGED_LINES = 25;
 
+async function main() {
 if (!hasOpenAIKey()) {
   console.log("draft: OPENAI_API_KEY not set — skipping (graceful no-op).");
   process.exit(0);
@@ -117,5 +159,22 @@ for (const field of ["voiceMd", "changelog"]) {
   }
 }
 
+// Neutralize any changelog meddling deterministically (don't rely on the prompt):
+// reset the proposal's changelog block to the current file's, byte-for-byte, so
+// validate.mjs's changelog-immutability check (6) can never be tripped by the
+// drafter. The model's body nudge survives and is still judged by the gate.
+const restored = restoreChangelogBlock(proposal.voiceMd, currentVoice);
+if (restored !== proposal.voiceMd) {
+  console.log("draft: restored the protected changelog block (drafter had touched it).");
+  proposal.voiceMd = restored;
+}
+
 writeFileSync(OUT, JSON.stringify(proposal, null, 2));
 console.log(`draft: proposed a voice nudge → ${OUT}`);
+}
+
+// Run the pipeline only when invoked as a script — importing this module (e.g.
+// from draft.test.mjs for restoreChangelogBlock) must NOT execute it or exit.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main();
+}
