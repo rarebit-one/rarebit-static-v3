@@ -46,6 +46,8 @@ You are writing this week's Field Note — a calm, concrete log entry, not a mar
 
 PUBLIC work may be named and linked, using ONLY the repo names, PR titles, and URLs given in the facts. Do not construct or guess any other URL.
 
+NAMING RULE — read carefully. You may name and link rarebit-one's OWN public repositories — by their bare name (e.g. "standard_id", "standard_health", "rarebit-static-v3") and via their github.com/rarebit-one/<repo> URLs. That is the entire point of a field note: a public log of rarebit-one's own work. But you must NEVER name any OTHER organization or its projects — not even when such a name appears inside a rarebit-one public PR's title or body. In particular, a split-out sibling org named "luminality" (its repos "luminality-web", "luminality-app", "luminality-ui", and the org "luminalityai") must NEVER be named: refer to it generically ("a sibling project", "another org") or omit it entirely. Likewise never name a client, never name a private or internal-only repository, and never invent a metric — ground every number and link in the facts above.
+
 PRIVATE/client work is provided ONLY as anonymized category counts. Refer to it generically — e.g. "across private systems, N runs ran mostly green" — and NEVER name or describe a client, product, person, or private repository, even in passing.
 
 When it is genuinely relevant, you may link to a past field note using its /field-notes/<slug>/ path from the provided pastNotes.

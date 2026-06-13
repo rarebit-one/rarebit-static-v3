@@ -122,8 +122,10 @@ Block (verdict "blocking") ONLY when the diff contains at least one of:
 - A change that would break the build or type-check (astro check), or invalid YAML/JS that fails CI.
 - A violation of the repo's content invariants:
   * a leaked CLIENT or PRIVATE identifier (client name, private repo name, login, internal URL, real customer data),
+  * the name of ANOTHER organization or its projects — including a split-out sibling org such as "luminalityai" / "luminality-web" / "luminality-app" / "luminality-ui",
   * off-brand voice that contradicts VOICE.md / the brand guide,
   * a FABRICATED metric (a number presented as real that isn't grounded in public data).
+  CARVE-OUT (narrow): rarebit-one's OWN public repositories are NOT a leak. In field-notes content (src/content/field-notes/*.md), references to rarebit-one's own public repos — by bare name (e.g. "rarebit-static-v3", "standard_id", "standard_health") and via github.com/rarebit-one/<repo> links — are expected, on-brand, and the entire point of a public field note. Do NOT flag these. This carve-out permits ONLY rarebit-one's own public repo identifiers, and ONLY as the kind of public-PR/release references field notes legitimately make. It does NOT cover any other org (still block "luminality*"/"luminalityai" and any client), any private/internal-only repo name, any private blocklist identifier, or any email/@handle/fabricated number — those remain blocking everywhere, field notes included.
 
 Do NOT block on:
 - Style nitpicks, naming preferences, formatting, comment wording.
