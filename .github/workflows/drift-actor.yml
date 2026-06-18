@@ -64,6 +64,16 @@ jobs:
         with:
           node-version: 24
 
+      - name: Slack — narrate start (thread root)
+        id: slack
+        continue-on-error: true
+        uses: rarebit-one/.github/.github/actions/slack-deploy-thread@main
+        with:
+          bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel: ${{ vars.SLACK_STATIC_V3_CHANNEL_ID }}
+          mode: start
+          text: "🧪 *Drift actor started* — `${{ github.repository }}`\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|run log>"
+
       - name: Act (claim an open drift issue)
         run: node scripts/freshness/act.mjs claim.json
 
@@ -92,6 +102,7 @@ jobs:
           node scripts/freshness/validate.mjs state.json patch.json
 
       - name: Open an auto-land PR (if the sweep changed anything)
+        id: open_pr
         env:
           GH_TOKEN: ${{ secrets.AUTOLAND_PAT }}
         run: |
@@ -105,10 +116,12 @@ jobs:
           # source edits.
           if [ -z "$(git status --porcelain)" ]; then
             echo "No drift to fix — nothing to open. Claim released by the final step."
+            echo "outcome=no-drift" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [ -z "$GH_TOKEN" ]; then
             echo "AUTOLAND_PAT not set — skipping PR open (working tree changes left uncommitted). Claim released by the final step."
+            echo "outcome=unwired" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           # Append the run id so a same-day re-run can't collide on the branch (#55).
@@ -127,11 +140,13 @@ jobs:
           if [ -n "$issue" ]; then close_line="
 
           Closes #${issue}."; fi
-          gh pr create \
+          pr_url="$(gh pr create \
             --title "Site freshness: weekly drift sweep" \
             --body "Automated weekly drift sweep, consumed from an open \`drift\` issue. Bounded copy edits to stale static claims, and append-only addenda on drifted field notes (original prose preserved byte-for-byte by \`scripts/freshness/validate.mjs\`). Opened for auto-land review.${close_line}" \
             --label auto-land \
-            --head "$BRANCH"
+            --head "$BRANCH")"
+          echo "outcome=pr" >> "$GITHUB_OUTPUT"
+          echo "pr_url=${pr_url}" >> "$GITHUB_OUTPUT"
           # Mark that a PR was opened, so the final self-heal step leaves the claim
           # in place (the issue closes on MERGE via `Closes #<issue>`).
           touch pr-opened.flag
@@ -161,3 +176,18 @@ jobs:
           fi
           echo "Releasing claim on #${issue} so it retries next run."
           node -e 'import("./scripts/lib/issues.mjs").then(m=>m.unclaimIssue(Number(process.argv[1])))' "$issue" || true
+
+      - name: Slack — narrate outcome (thread reply)
+        if: always()
+        continue-on-error: true
+        uses: rarebit-one/.github/.github/actions/slack-deploy-thread@main
+        with:
+          bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel: ${{ vars.SLACK_STATIC_V3_CHANNEL_ID }}
+          mode: reply
+          thread_ts: ${{ steps.slack.outputs.thread_ts }}
+          text: >-
+            ${{ job.status != 'success' && format('🔴 drift actor failed — <{0}/{1}/actions/runs/{2}|run log>', github.server_url, github.repository, github.run_id)
+            || (steps.open_pr.outputs.outcome == 'pr' && format('✅ drift fixed — {0}', steps.open_pr.outputs.pr_url))
+            || (steps.open_pr.outputs.outcome == 'unwired' && format('⚠️ drift found but AUTOLAND_PAT unset — PR not opened — <{0}/{1}/actions/runs/{2}|run log>', github.server_url, github.repository, github.run_id))
+            || format('no drift to fix — <{0}/{1}/actions/runs/{2}|run log>', github.server_url, github.repository, github.run_id) }}

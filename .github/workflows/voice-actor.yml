@@ -61,6 +61,16 @@ jobs:
         with:
           node-version: 24
 
+      - name: Slack — narrate start (thread root)
+        id: slack
+        continue-on-error: true
+        uses: rarebit-one/.github/.github/actions/slack-deploy-thread@main
+        with:
+          bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel: ${{ vars.SLACK_STATIC_V3_CHANNEL_ID }}
+          mode: start
+          text: "🧪 *Voice actor started* — `${{ github.repository }}`\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|run log>"
+
       - name: Act (claim an open voice-proposal; reconstruct its signal)
         run: node scripts/voice/act.mjs signal.json claim.json
 
@@ -81,6 +91,7 @@ jobs:
           node scripts/voice/validate.mjs VOICE.md proposal.json VOICE.md
 
       - name: Open auto-land PR (if the voice changed)
+        id: open_pr
         env:
           GH_TOKEN: ${{ secrets.AUTOLAND_PAT }}
         run: |
@@ -92,11 +103,13 @@ jobs:
 
           if [ -z "$(git status --porcelain VOICE.md)" ]; then
             echo "VOICE.md unchanged (no proposal, thin signal, or gate rejected) — no PR. Claim released by the final step."
+            echo "outcome=no-change" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [ -z "$GH_TOKEN" ]; then
             echo "AUTOLAND_PAT not set — voice evolved locally but cannot open a PR. No-op. Claim released by the final step."
             git checkout -- VOICE.md
+            echo "outcome=unwired" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           # Append the run id so a same-day re-run can't collide on the branch (#55).
@@ -115,12 +128,14 @@ jobs:
           if [ -n "$issue" ]; then close_line="
 
           Closes #${issue}."; fi
-          gh pr create \
+          pr_url="$(gh pr create \
             --title "Voice: weekly evolution ($(date +%Y-%m-%d))" \
             --body "Weekly bounded evolution of \`VOICE.md\`, consumed from an open \`voice-proposal\` issue and held to a small, structure-preserving diff by \`scripts/voice/validate.mjs\` (the #54 gate). The new changelog entry at the top of VOICE.md describes the nudge; revert by reverting this PR.${close_line}" \
             --label auto-land \
             --base main \
-            --head "$branch"
+            --head "$branch")"
+          echo "outcome=pr" >> "$GITHUB_OUTPUT"
+          echo "pr_url=${pr_url}" >> "$GITHUB_OUTPUT"
           # Mark that a PR was opened, so the final self-heal step leaves the claim
           # in place (the issue closes on MERGE via `Closes #<issue>`).
           touch pr-opened.flag
@@ -150,3 +165,18 @@ jobs:
           fi
           echo "Releasing claim on #${issue} so it retries next run."
           node -e 'import("./scripts/lib/issues.mjs").then(m=>m.unclaimIssue(Number(process.argv[1])))' "$issue" || true
+
+      - name: Slack — narrate outcome (thread reply)
+        if: always()
+        continue-on-error: true
+        uses: rarebit-one/.github/.github/actions/slack-deploy-thread@main
+        with:
+          bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel: ${{ vars.SLACK_STATIC_V3_CHANNEL_ID }}
+          mode: reply
+          thread_ts: ${{ steps.slack.outputs.thread_ts }}
+          text: >-
+            ${{ job.status != 'success' && format('🔴 voice actor failed — <{0}/{1}/actions/runs/{2}|run log>', github.server_url, github.repository, github.run_id)
+            || (steps.open_pr.outputs.outcome == 'pr' && format('✅ voice evolved — {0}', steps.open_pr.outputs.pr_url))
+            || (steps.open_pr.outputs.outcome == 'unwired' && format('⚠️ voice change found but AUTOLAND_PAT unset — PR not opened — <{0}/{1}/actions/runs/{2}|run log>', github.server_url, github.repository, github.run_id))
+            || format('no voice change — <{0}/{1}/actions/runs/{2}|run log>', github.server_url, github.repository, github.run_id) }}
