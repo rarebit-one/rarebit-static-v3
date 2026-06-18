@@ -31,6 +31,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Open the Slack thread root for this production deploy. Runs only when the
+  # triggering CI run succeeded (same gate as check-tracking). The outcome reply
+  # is posted by narrate-outcome once tracking finishes. Fail-soft throughout.
+  narrate-start:
+    name: Slack — narrate start
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      thread_ts: ${{ steps.slack.outputs.thread_ts }}
+    steps:
+      - name: Slack — narrate start (thread root)
+        id: slack
+        continue-on-error: true
+        uses: rarebit-one/.github/.github/actions/slack-deploy-thread@main
+        with:
+          bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel: ${{ vars.SLACK_STATIC_V3_CHANNEL_ID }}
+          mode: start
+          text: "🧪 *Production deploy started* — `${{ github.repository }}`\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|run log>"
+
   check-tracking:
     name: Check DO tracking config
     if: github.event.workflow_run.conclusion == 'success'
@@ -65,3 +85,24 @@ jobs:
     secrets:
       DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
       DIGITALOCEAN_APP_ID: ${{ secrets.DO_APP_ID }}
+
+  # Post the outcome reply into the deploy thread. Runs always (so a failed or
+  # skipped tracker still narrates), but only when the thread root was opened.
+  narrate-outcome:
+    name: Slack — narrate outcome
+    needs: [narrate-start, check-tracking, track-deployment]
+    if: ${{ always() && needs.narrate-start.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Slack — narrate outcome (thread reply)
+        continue-on-error: true
+        uses: rarebit-one/.github/.github/actions/slack-deploy-thread@main
+        with:
+          bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel: ${{ vars.SLACK_STATIC_V3_CHANNEL_ID }}
+          mode: reply
+          thread_ts: ${{ needs.narrate-start.outputs.thread_ts }}
+          text: >-
+            ${{ needs.track-deployment.result == 'success' && format('✅ production deploy live — <{0}|rarebit.one>', 'https://rarebit.one')
+            || (needs.track-deployment.result == 'skipped' && format('ℹ️ deploy tracking not configured (no DO_APP_ID) — <{0}/{1}/actions/runs/{2}|run log>', github.server_url, github.repository, github.run_id))
+            || format('🔴 production deploy failed — <{0}/{1}/actions/runs/{2}|run log>', github.server_url, github.repository, github.run_id) }}

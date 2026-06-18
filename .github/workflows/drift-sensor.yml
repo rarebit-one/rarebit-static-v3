@@ -44,8 +44,31 @@ jobs:
         with:
           node-version: 24
 
+      - name: Slack — narrate start (thread root)
+        id: slack
+        continue-on-error: true
+        uses: rarebit-one/.github/.github/actions/slack-deploy-thread@main
+        with:
+          bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel: ${{ vars.SLACK_STATIC_V3_CHANNEL_ID }}
+          mode: start
+          text: "🧪 *Drift sensor started* — `${{ github.repository }}`\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|run log>"
+
       - name: Gather (read the worktree → state.json)
         run: node scripts/freshness/gather.mjs state.json
 
       - name: Sense (file a deduped drift issue, if warranted)
         run: node scripts/freshness/sense.mjs state.json
+
+      - name: Slack — narrate outcome (thread reply)
+        if: always()
+        continue-on-error: true
+        uses: rarebit-one/.github/.github/actions/slack-deploy-thread@main
+        with:
+          bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel: ${{ vars.SLACK_STATIC_V3_CHANNEL_ID }}
+          mode: reply
+          thread_ts: ${{ steps.slack.outputs.thread_ts }}
+          text: >-
+            ${{ job.status == 'success' && '✅ drift sweep sensed — check the queue' || '🔴 drift sensor failed' }}
+            — <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|run log>

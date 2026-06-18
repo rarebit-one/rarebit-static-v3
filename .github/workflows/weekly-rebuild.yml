@@ -16,6 +16,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Slack — narrate start (thread root)
+        id: slack
+        continue-on-error: true
+        uses: rarebit-one/.github/.github/actions/slack-deploy-thread@main
+        with:
+          bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel: ${{ vars.SLACK_STATIC_V3_CHANNEL_ID }}
+          mode: start
+          text: "🧪 *Weekly rebuild started* — `${{ github.repository }}`\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|run log>"
+
       - name: Trigger DO App Platform deployment
         # App ID = rarebit-static-v3 on App Platform (see .do/app.yaml)
         run: |
@@ -25,3 +35,16 @@ jobs:
             -d '{"force_build": true}' \
             "https://api.digitalocean.com/v2/apps/ca13ba74-9817-4286-86e9-21eda91e05c2/deployments" \
             > /dev/null
+
+      - name: Slack — narrate outcome (thread reply)
+        if: always()
+        continue-on-error: true
+        uses: rarebit-one/.github/.github/actions/slack-deploy-thread@main
+        with:
+          bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel: ${{ vars.SLACK_STATIC_V3_CHANNEL_ID }}
+          mode: reply
+          thread_ts: ${{ steps.slack.outputs.thread_ts }}
+          text: >-
+            ${{ job.status == 'success' && '✅ forced DO rebuild triggered' || '🔴 weekly rebuild failed' }}
+            — <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|run log>
