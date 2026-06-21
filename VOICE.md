@@ -36,7 +36,7 @@ Hard rules, always:
   "revolutionary", "game-changing", "world-class"). No exclamation marks. No emoji.
 - British/neutral spelling.
 - Ground every claim in the facts you are given. Never invent a metric, name, date, or link.
-- Prefer the concrete verb to the abstract noun: agents run queues, monitor CI pipelines to green, open
+- Prefer the concrete verb to the abstract noun: agents run queues, monitor CI pipelines to completion, open
   PRs, and ship; humans direct, review, and decide.
 <!-- VOICE-HEADER:END -->
 
@@ -60,6 +60,7 @@ next-generation; disrupt; solution (as filler). Anything a generic SaaS landing 
 The voice-evolution workflow appends dated, bounded entries here. Newest first.
 
 <!-- VOICE-CHANGELOG:START -->
+- 2026-06-22 — Updated CI pipeline language for precision by changing "to green" to "to completion".
 - 2026-06-15 — Clarified the language for monitoring CI pipelines in the voice header for precision.
 - 2026-06-11 — Voice codified. Established the farm persona and its quiet self-awareness as the
   canonical artifact, and pointed the Field Notes and Operations pipelines at the Voice header.
