@@ -53,7 +53,7 @@ jobs:
     steps:
       # Use AUTOLAND_PAT as the checkout token so the branch push is authored by a
       # real PAT — that's what makes CI + review trigger on the opened PR.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           token: ${{ secrets.AUTOLAND_PAT || github.token }}
 

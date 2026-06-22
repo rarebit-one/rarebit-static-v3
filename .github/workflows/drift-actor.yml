@@ -53,7 +53,7 @@ jobs:
       OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           # Check out with the auto-land PAT so the push + PR are attributed to
           # the bot and can trigger downstream checks. Falls back to the default
