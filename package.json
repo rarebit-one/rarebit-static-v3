@@ -17,16 +17,16 @@
     "sync:mcp": "node scripts/sync-mcp-open-source.mjs"
   },
   "dependencies": {
-    "@astrojs/check": "^0.9.4",
+    "@astrojs/check": "^0.9.9",
     "@astrojs/rss": "^4.0.18",
-    "@astrojs/sitemap": "^3.6.0",
+    "@astrojs/sitemap": "^3.7.3",
     "@fontsource/sora": "^5.2.5",
     "@fontsource/source-code-pro": "^5.2.5",
     "@fontsource/space-grotesk": "^5.2.5",
     "@tailwindcss/vite": "^4.3.1",
-    "astro": "^5.8.0",
+    "astro": "^6.4.8",
     "tailwindcss": "^4.1.5",
-    "typescript": "^5.8.0",
-    "vite": "^6.4.3"
+    "typescript": "^6.0.3",
+    "vite": "^7.3.2"
   }
 }
