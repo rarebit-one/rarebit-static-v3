@@ -1,0 +1,10 @@
+# pinact config — enforce SHA pins on third-party actions.
+# First-party reusables/composites (this org) intentionally stay on @main / @vN:
+# pinning them to a SHA creates cross-repo churn and defeats propagation. Local (./)
+# refs can't be SHA-pinned. Ignore both so `pinact run` / `--check` don't flag them.
+version: 3
+ignore_actions:
+  - name: rarebit-one/.*
+    ref: .*
+  - name: \./.*
+    ref: .*

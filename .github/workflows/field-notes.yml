@@ -46,14 +46,14 @@ jobs:
       AUTOLAND_PAT: ${{ secrets.AUTOLAND_PAT }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           # Push with the real-user PAT so the branch push triggers CI +
           # review-verdict on the opened PR. Falls back to GITHUB_TOKEN when the
           # PAT is unset (the open-PR step then no-ops, so nothing is published).
           token: ${{ secrets.AUTOLAND_PAT || secrets.GITHUB_TOKEN }}
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 22
 
