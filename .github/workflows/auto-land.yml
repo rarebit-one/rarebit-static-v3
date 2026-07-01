@@ -55,7 +55,7 @@ jobs:
       OWNER: ${{ github.repository_owner }}
       REPO: ${{ github.event.repository.name || github.repository }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Sweep
         run: node .github/scripts/auto-land.mjs
