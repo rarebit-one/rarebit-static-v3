@@ -28,13 +28,29 @@ jobs:
 
       - name: Trigger DO App Platform deployment
         # App ID = rarebit-static-v3 on App Platform (see .do/app.yaml)
+        # A missing DIGITALOCEAN_ACCESS_TOKEN no-ops this step (workflow stays
+        # green until wired up), mirroring farm-feed/field-notes. When the token
+        # IS set but the API rejects it, surface the HTTP status + body so the
+        # failure is actionable instead of a bare `curl 22`.
+        env:
+          DO_API_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
         run: |
-          curl -sf -X POST \
-            -H "Authorization: Bearer ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}" \
+          if [ -z "${DO_API_TOKEN:-}" ]; then
+            echo "::warning::DIGITALOCEAN_ACCESS_TOKEN is not set — skipping forced DO rebuild (no-op)."
+            echo "Set the secret (rarebit team, write scope) to enable the weekly rebuild — see the /do-deploy-tokens skill."
+            exit 0
+          fi
+          status=$(curl -sS -o /tmp/do-resp.json -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${DO_API_TOKEN}" \
             -H "Content-Type: application/json" \
             -d '{"force_build": true}' \
-            "https://api.digitalocean.com/v2/apps/ca13ba74-9817-4286-86e9-21eda91e05c2/deployments" \
-            > /dev/null
+            "https://api.digitalocean.com/v2/apps/ca13ba74-9817-4286-86e9-21eda91e05c2/deployments")
+          if [ "${status}" -ge 400 ]; then
+            echo "::error::DO deployments API returned HTTP ${status}"
+            cat /tmp/do-resp.json
+            exit 1
+          fi
+          echo "Forced DO rebuild triggered (HTTP ${status})."
 
       - name: Slack — narrate outcome (thread reply)
         if: always()
