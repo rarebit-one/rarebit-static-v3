@@ -60,6 +60,7 @@ next-generation; disrupt; solution (as filler). Anything a generic SaaS landing 
 The voice-evolution workflow appends dated, bounded entries here. Newest first.
 
 <!-- VOICE-CHANGELOG:START -->
+- 2026-07-06 — Added 'self-awareness' to the Lexicon to capture subtlety in AI's identity transformation.
 - 2026-06-29 — Removed "to green" from the Lexicon to reflect modern CI practices more broadly.
 - 2026-06-22 — Updated CI pipeline language for precision by changing "to green" to "to completion".
 - 2026-06-15 — Clarified the language for monitoring CI pipelines in the voice header for precision.
