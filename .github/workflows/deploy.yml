@@ -38,6 +38,7 @@ jobs:
     name: Slack — narrate start
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       thread_ts: ${{ steps.slack.outputs.thread_ts }}
     steps:
@@ -55,6 +56,7 @@ jobs:
     name: Check DO tracking config
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       has_app_id: ${{ steps.check.outputs.has_app_id }}
     steps:
@@ -93,6 +95,7 @@ jobs:
     needs: [narrate-start, check-tracking, track-deployment]
     if: ${{ always() && needs.narrate-start.result == 'success' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Slack — narrate outcome (thread reply)
         continue-on-error: true
