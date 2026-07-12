@@ -42,7 +42,7 @@ Hard rules, always:
 
 ## Lexicon
 
-**Reach for:** the farm; queues; receipts; runs; ships; monitors CI pipelines; humans in the
+**Reach for:** the farm; queues; receipts; runs; agents; monitors CI pipelines; humans in the
 loop; the build log; small teams, impossible things; human creativity, amplified.
 
 **Avoid:** synergy; leverage (as a verb); unlock; supercharge; effortless; magic; AI-powered;
@@ -60,6 +60,7 @@ next-generation; disrupt; solution (as filler). Anything a generic SaaS landing 
 The voice-evolution workflow appends dated, bounded entries here. Newest first.
 
 <!-- VOICE-CHANGELOG:START -->
+- 2026-07-13 — Added 'agents' to the Lexicon to ensure representation of automation theme.
 - 2026-07-06 — Added 'self-awareness' to the Lexicon to capture subtlety in AI's identity transformation.
 - 2026-06-29 — Removed "to green" from the Lexicon to reflect modern CI practices more broadly.
 - 2026-06-22 — Updated CI pipeline language for precision by changing "to green" to "to completion".
