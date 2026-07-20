@@ -6,7 +6,7 @@ pubDate: 2026-07-20T06:15:43+08:00
 
 ## Standard ID Releases
 
-This week saw the release of [standard_id v0.29.0](https://github.com/rarebit-one/standard_id/releases/tag/v0.29.0) and its follow-up minor release [v0.29.1](https://github.com/rarebit-one/standard_id/releases/tag/v0.29.1). Version 0.29.0 introduced improved rate-limiting features, including GET loop management and login alias handling. This was quickly followed by 0.29.1, a release focusing on stability and minor improvements as outlined in [PR #275](https://github.com/rarebit-one/standard_id/pull/275).
+This week saw the release of [standard_id v0.29.0](https://github.com/rarebit-one/standard_id/releases/tag/v0.29.0) and its follow-up patch release [v0.29.1](https://github.com/rarebit-one/standard_id/releases/tag/v0.29.1). Version 0.29.0 introduced improved rate-limiting features, including GET loop management and login alias handling. This was quickly followed by 0.29.1, a release focusing on stability and minor improvements as outlined in [PR #275](https://github.com/rarebit-one/standard_id/pull/275).
 
 Enhancements in standard_id focused on post-authentication redirection paths. The new method, `redirect_with_inertia`, is detailed in [PR #274](https://github.com/rarebit-one/standard_id/pull/274), simplifying navigation post-login.
 
