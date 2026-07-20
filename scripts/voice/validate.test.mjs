@@ -73,6 +73,42 @@ test("accepts a small bounded nudge and prepends one dated changelog entry", () 
   assert.ok(out.includes("orchestrate (as filler)"), "the bounded edit should be present");
 });
 
+test("rejects a changelog-only diff (no-op false evolution)", () => {
+  // The proposal leaves VOICE.md byte-for-byte unchanged (body AND changelog
+  // block) but supplies a fresh dated entry. The bounded diff is happy — zero
+  // lines changed outside the changelog — but the canonical voice never moved,
+  // so the changelog would record an evolution that didn't happen. This is the
+  // PR #262 shape; the no-op guard must reject it.
+  const { code, wrote, stderr } = runValidate({ voiceMd: CURRENT, changelog: CHANGELOG_ENTRY });
+  assert.equal(code, 1);
+  assert.ok(!wrote, "must not write on a changelog-only no-op");
+  assert.match(stderr, /no-op evolution/);
+});
+
+test("rejects a whitespace-only non-changelog diff (no-op false evolution)", () => {
+  // The only change to the body is added/altered whitespace (trailing spaces +
+  // a blank line). After normalisation the voice is identical, so this is still
+  // a false evolution and must be rejected — not counted as a real nudge.
+  const voiceMd = CURRENT.replace(
+    "Confidence comes from receipts,\nnot adjectives.",
+    "Confidence comes from receipts,   \n\nnot adjectives.",
+  );
+  assert.notEqual(voiceMd, CURRENT, "fixture must contain the phrase the whitespace edit targets");
+  const { code, wrote, stderr } = runValidate({ voiceMd, changelog: CHANGELOG_ENTRY });
+  assert.equal(code, 1);
+  assert.ok(!wrote, "must not write on a whitespace-only no-op");
+  assert.match(stderr, /no-op evolution/);
+});
+
+test("accepts a changelog entry that IS accompanied by a real body edit", () => {
+  // The complement of the two no-op cases: a genuine one-line nudge to the body
+  // alongside the changelog entry passes the no-op guard (and the rest of the
+  // gate), and the evolved VOICE.md is written.
+  const { code, wrote, stderr } = runValidate(smallNudge());
+  assert.equal(code, 0, `expected pass; stderr: ${stderr}`);
+  assert.ok(wrote, "a real body edit + changelog entry must be accepted");
+});
+
 test("rejects an oversized rewrite (bounded-diff exceeded)", () => {
   // Replace the whole body between header end and the Lexicon with many new
   // lines — far more than the threshold — while keeping markers intact.

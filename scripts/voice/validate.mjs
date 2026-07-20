@@ -12,6 +12,11 @@
 //   2. BOUNDED DIFF — comparing current vs proposed with the changelog block
 //      excluded, more than MAX_CHANGED_LINES lines changed. This is the
 //      "tightens, does not rewrite" lock.
+//   2b. NO-OP GUARD — the non-changelog body must ACTUALLY change. A diff that
+//      only adds a changelog entry (or whose sole non-changelog change is
+//      whitespace) is a false evolution: the changelog records a nudge the
+//      canonical voice never received. This is the lower bound to check 2's
+//      upper bound. (Motivating case: PR #262.)
 //   3. INVARIANTS — the VOICE-HEADER no longer contains the never-name-clients,
 //      no-hype-adjectives, neutral-spelling, or ground-claims rules
 //      (representative substrings).
@@ -117,6 +122,27 @@ if (proposedChangelog === null) fail("proposed voiceMd is missing the VOICE-CHAN
 const changed = changedLineCount(withoutChangelog(current), withoutChangelog(proposed));
 if (changed > MAX_CHANGED_LINES) {
   fail(`bounded-diff exceeded — ${changed} lines changed (max ${MAX_CHANGED_LINES}); this is a rewrite, not a nudge`);
+}
+
+// --- 2b. NO-OP GUARD — the voice body outside the changelog must really change
+// Check 2 caps how MUCH may change; this enforces that SOMETHING did. A voice
+// evolution that adds a changelog entry but leaves the canonical voice (read by
+// scripts/lib/voice.mjs) untouched records a nudge that never happened. We
+// normalise away whitespace so a diff whose only non-changelog change is
+// reflow/indentation still counts as a no-op, then compare the bodies with the
+// changelog block excised. Equal bodies ⇒ false evolution ⇒ reject.
+// (Motivating case: PR #262, a changelog-only diff the bounded gate waved through.)
+const normalizeBody = (text) =>
+  text
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter((line) => line !== "")
+    .join("\n");
+if (normalizeBody(withoutChangelog(current)) === normalizeBody(withoutChangelog(proposed))) {
+  fail(
+    "no-op evolution — the proposal adds a changelog entry but makes no real change to VOICE.md " +
+      "outside the changelog block (a changelog-only or whitespace-only diff is a false evolution)",
+  );
 }
 
 // --- 3. INVARIANTS — the header must still carry every hard rule ------------
