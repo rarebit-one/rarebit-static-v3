@@ -150,7 +150,42 @@ jobs:
                 exit 1
                 ;;
               CANCELED)
-                echo "::error::Deployment was canceled on DO"
+                # DO uses CANCELED for TWO different things, and only one is a
+                # failure of this pipeline:
+                #   1. a newer deployment started and cancelled this in-flight one
+                #      — benign, and identical in meaning to SUPERSEDED below;
+                #   2. a genuine abort (cancelled by hand, or DO gave up).
+                # Treating both as red made three commits pushed within five
+                # minutes fire a 🚨 "Production deploy failed" Slack alert while
+                # production was in fact healthy on the newest commit. False
+                # alerts are worse than no alerts — they train everyone to ignore
+                # the channel.
+                # Distinguish them by fact, not guess: if DO holds a deployment
+                # created after this one, this was superseded in all but name.
+                DEPLOY_CREATED=$(echo "$DEPLOY_INFO" | jq -r '.created_at')
+                NEWER_COUNT=$(echo "$RESPONSE" | jq -r --arg ts "$DEPLOY_CREATED" \
+                  '[.deployments[] | select(.created_at > $ts)] | length' 2>/dev/null || echo 0)
+                if [ "${NEWER_COUNT:-0}" -gt 0 ]; then
+                  echo "::warning::Deployment was cancelled by a newer deployment ($NEWER_COUNT newer found) — not a failure"
+                  # Re-emit the phase as SUPERSEDED. Downstream consumers (the
+                  # PR-comment step below, and deploy.yml's Slack notify) branch on
+                  # JOB_STATUS + DO_PHASE, and only special-case SUPERSEDED — so
+                  # leaving this as CANCELED while exiting 0 would fall through to
+                  # the generic success branch and announce a commit that never went
+                  # live as "is live", trading a false failure for a false success.
+                  # GITHUB_OUTPUT is append-mode and the last write wins.
+                  echo "phase=SUPERSEDED" >> "$GITHUB_OUTPUT"
+                  echo ""
+                  echo "### Deployment Superseded (cancelled by a newer deploy)" >> "$GITHUB_STEP_SUMMARY"
+                  echo "" >> "$GITHUB_STEP_SUMMARY"
+                  echo "DO cancelled this deployment because a newer one started. That newer deployment's own tracking run reports the live result." >> "$GITHUB_STEP_SUMMARY"
+                  echo "" >> "$GITHUB_STEP_SUMMARY"
+                  echo "- **Commit:** \`$EXPECTED_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+                  echo "- **DO Deployment ID:** \`$DEPLOY_ID\`" >> "$GITHUB_STEP_SUMMARY"
+                  echo "- **Newer deployments:** $NEWER_COUNT" >> "$GITHUB_STEP_SUMMARY"
+                  exit 0
+                fi
+                echo "::error::Deployment was canceled on DO (no newer deployment — genuine abort)"
                 echo ""
                 echo "### Deployment Canceled" >> "$GITHUB_STEP_SUMMARY"
                 echo "" >> "$GITHUB_STEP_SUMMARY"
