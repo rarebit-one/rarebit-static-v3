@@ -167,6 +167,14 @@ jobs:
                   '[.deployments[] | select(.created_at > $ts)] | length' 2>/dev/null || echo 0)
                 if [ "${NEWER_COUNT:-0}" -gt 0 ]; then
                   echo "::warning::Deployment was cancelled by a newer deployment ($NEWER_COUNT newer found) — not a failure"
+                  # Re-emit the phase as SUPERSEDED. Downstream consumers (the
+                  # PR-comment step below, and deploy.yml's Slack notify) branch on
+                  # JOB_STATUS + DO_PHASE, and only special-case SUPERSEDED — so
+                  # leaving this as CANCELED while exiting 0 would fall through to
+                  # the generic success branch and announce a commit that never went
+                  # live as "is live", trading a false failure for a false success.
+                  # GITHUB_OUTPUT is append-mode and the last write wins.
+                  echo "phase=SUPERSEDED" >> "$GITHUB_OUTPUT"
                   echo ""
                   echo "### Deployment Superseded (cancelled by a newer deploy)" >> "$GITHUB_STEP_SUMMARY"
                   echo "" >> "$GITHUB_STEP_SUMMARY"
