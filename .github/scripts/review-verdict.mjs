@@ -109,9 +109,18 @@ if (diff.length > MAX_DIFF) {
 
 // --- rubric ----------------------------------------------------------------
 
+// Today's date, so the model can judge dates in the diff (e.g. a field note's
+// `pubDate`) against reality instead of its training cutoff — without this it
+// flagged an already-past pubDate as "a future date".
+const TODAY = new Date().toISOString().slice(0, 10);
+
 const RUBRIC = `You are a strict but fair pre-merge gate for the rarebit.one static marketing
 site (Astro + Tailwind 4, zero JS frameworks). You return a binding verdict that
 decides whether a pull request may auto-merge with NO human in the loop.
+
+TODAY'S DATE IS ${TODAY} (UTC). Use it — not your training cutoff — for any
+judgement about dates in the diff. A date on or before ${TODAY} is in the PAST;
+never call it future-dated.
 
 Return ONLY a JSON object, no prose, no markdown fences:
 { "verdict": "clear" | "blocking", "findings": ["..."] }
@@ -124,7 +133,8 @@ Block (verdict "blocking") ONLY when the diff contains at least one of:
   * a leaked CLIENT or PRIVATE identifier (client name, private repo name, login, internal URL, real customer data),
   * the name of ANOTHER organization or its projects — including a split-out sibling org such as "luminalityai" / "luminality-web" / "luminality-app" / "luminality-ui",
   * off-brand voice that contradicts VOICE.md / the brand guide,
-  * a FABRICATED metric (a number presented as real that isn't grounded in public data).
+  * a FABRICATED metric (a number invented or presented as real without a grounding source — public data OR the pipeline's own sanitized private totals).
+  CARVE-OUT (narrow): an ANONYMIZED PRIVATE AGGREGATE is NOT a fabricated metric. In field-notes content, a run count / system count / success-or-green rate over the farm's OWN private infrastructure — stated in aggregate and WITHOUT naming any private repo, branch, login, or client (e.g. "551 runs across 23 systems with a 71% success rate", "Across private systems, 438 runs ... 79% green") — is computed deterministically by scripts/field-notes/gather.mjs inside its private zone and is exactly what field-notes.yml's "Gather (public detail + anonymized private aggregate)" step exists to emit. Such a figure is grounded even though you cannot verify it against public data from the diff alone, so do NOT flag it as fabricated or unsourced. This carve-out permits ONLY aggregate counts/rates presented without private identifiers. It does NOT license a number attached to a NAMED private repo or client, a specific private PR/commit/person, or a claim of a kind the pipeline does not produce (revenue, headcount, customer counts, benchmark results) — and a number that is genuinely invented, internally contradictory, or contradicted by the diff's own public facts remains BLOCKING. You cannot verify a specific figure against the pipeline's totals from the diff alone, so apply a PLAUSIBILITY check you CAN make: the aggregate must be self-consistent (any per-category counts must not exceed the stated total; a stated rate must match the counts it summarizes) and proportionate to the activity the note itself describes. Block an aggregate that is internally impossible, or wildly out of scale with the week's evidence (e.g. "999 runs across 42 systems" in a note reporting a handful of PRs across a few repos). Numeric provenance for auto-published notes is enforced upstream by scripts/field-notes/validate.mjs; this rubric is the secondary layer, so judge plausibility, not provenance.
   CARVE-OUT (narrow): rarebit-one's OWN public repositories are NOT a leak. In field-notes content (src/content/field-notes/*.md), references to rarebit-one's own public repos — by bare name (e.g. "rarebit-static-v3", "standard_id", "standard_health") and via github.com/rarebit-one/<repo> links — are expected, on-brand, and the entire point of a public field note. Do NOT flag these. This carve-out permits ONLY rarebit-one's own public repo identifiers, and ONLY as the kind of public-PR/release references field notes legitimately make. It does NOT cover any other org (still block "luminality*"/"luminalityai" and any client), any private/internal-only repo name, any private blocklist identifier, or any email/@handle/fabricated number — those remain blocking everywhere, field notes included.
 
 Do NOT block on:
