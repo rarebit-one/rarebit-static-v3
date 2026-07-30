@@ -164,6 +164,120 @@ test("rejects a dead internal link", () => {
   assert.ok(!wrote);
 });
 
+test("rejects a hype term VOICE.md bans by name", () => {
+  const { code, wrote, stderr } = runValidate({
+    ...CLEAN,
+    body: CLEAN.body + "\n\nThe new projections are a seamless win.",
+  });
+  assert.equal(code, 1);
+  assert.ok(!wrote, "an enumerated hype term must be rejected");
+  assert.match(stderr, /hype term "seamless"/);
+});
+
+test("rejects an inflected hype term (robustness, supercharged)", () => {
+  // The ban is on the word, not one spelling of it.
+  for (const sentence of ["It improves code robustness.", "Queues are supercharged now."]) {
+    const { code, wrote } = runValidate({ ...CLEAN, body: CLEAN.body + `\n\n${sentence}` });
+    assert.equal(code, 1, `expected rejection for: ${sentence}`);
+    assert.ok(!wrote);
+  }
+});
+
+test("exempts a hype term quoted from a real PR title (no false positive)", () => {
+  // If the facts hand the drafter a PR literally titled "... more robust ...",
+  // repeating it is grounded — rejecting the week's whole note would be wrong.
+  const facts = JSON.parse(readFileSync(FACTS, "utf8"));
+  facts.public.prs[1].title = "Make aggregate projections more robust";
+  const { code, wrote } = runValidate(
+    {
+      ...CLEAN,
+      body: CLEAN.body + "\n\nThat PR is titled “Make aggregate projections more robust”.",
+    },
+    facts
+  );
+  assert.equal(code, 0);
+  assert.ok(wrote, "a hype term grounded in a PR title must not be rejected");
+});
+
+test("rejects an exclamation mark and an emoji", () => {
+  const bang = runValidate({ ...CLEAN, body: CLEAN.body + "\n\nWhat a week!" });
+  assert.equal(bang.code, 1);
+  assert.ok(!bang.wrote);
+
+  const emoji = runValidate({ ...CLEAN, body: CLEAN.body + "\n\nShipped \u{1F680} again." });
+  assert.equal(emoji.code, 1);
+  assert.ok(!emoji.wrote);
+});
+
+test("a grounded '!' does not exempt an invented '!' elsewhere in the body", () => {
+  // Regression lock: the exemption masks quoted facts, it is NOT a corpus-wide
+  // boolean. One legitimate "!" in a PR title must not wave through an
+  // unrelated invented one somewhere else in the note.
+  const facts = JSON.parse(readFileSync(FACTS, "utf8"));
+  facts.public.prs[1].title = "Ship it!";
+
+  // Quoting the grounded title alone is fine.
+  const quoted = runValidate(
+    { ...CLEAN, body: CLEAN.body + "\n\nThe PR was titled Ship it!" },
+    facts
+  );
+  assert.equal(quoted.code, 0);
+  assert.ok(quoted.wrote, "a '!' quoted verbatim from a PR title must pass");
+
+  // The same grounded title plus an invented "!" must still be rejected.
+  const invented = runValidate(
+    { ...CLEAN, body: CLEAN.body + "\n\nThe PR was titled Ship it! What a week!" },
+    facts
+  );
+  assert.equal(invented.code, 1);
+  assert.ok(!invented.wrote, "an invented '!' must be rejected despite a grounded one");
+});
+
+test("a grounded hype term buys one use, not unlimited use", () => {
+  // Proportional exemption: one "robust" in a PR title covers one "robust" in
+  // the note. A second, unbudgeted one is the drafter's own and must fail.
+  const facts = JSON.parse(readFileSync(FACTS, "utf8"));
+  facts.public.prs[1].title = "Make aggregate projections more robust";
+
+  const within = runValidate(
+    { ...CLEAN, body: CLEAN.body + "\n\nProjections were made more robust." },
+    facts
+  );
+  assert.equal(within.code, 0);
+  assert.ok(within.wrote, "one grounded use must pass");
+
+  const over = runValidate(
+    {
+      ...CLEAN,
+      body: CLEAN.body + "\n\nProjections were made more robust. The whole platform is robust.",
+    },
+    facts
+  );
+  assert.equal(over.code, 1);
+  assert.ok(!over.wrote, "an unbudgeted second use must be rejected");
+});
+
+test("past-note titles do not ground a hype term (no cross-week ratchet)", () => {
+  // Grounding is this week's facts only — a term published in an earlier note's
+  // title must not exempt it forever after.
+  const facts = JSON.parse(readFileSync(FACTS, "utf8"));
+  facts.pastNotes[0].title = "A seamless week";
+  const { code, wrote } = runValidate(
+    { ...CLEAN, body: CLEAN.body + "\n\nAnother seamless week." },
+    facts
+  );
+  assert.equal(code, 1);
+  assert.ok(!wrote, "a past note's title must not ground a hype term");
+});
+
+test("the clean draft's ordinary prose is not flagged as hype", () => {
+  // Guards against the gate creeping into a false-positive machine: the CLEAN
+  // fixture is representative compliant prose and must stay passing.
+  const { code, wrote } = runValidate(CLEAN);
+  assert.equal(code, 0);
+  assert.ok(wrote);
+});
+
 test("thin week is a no-op, not a failure (exit 0, nothing written)", () => {
   const thin = {
     window: { from: "2026-06-01", to: "2026-06-07" },
