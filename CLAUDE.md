@@ -109,8 +109,13 @@ npm run preview  # serve dist/
   the one LLM call (one OpenAI chat-completions call via `scripts/lib/llm.mjs`; model =
   `OPENAI_MODEL` repo var, default `gpt-4o`) grounded only in those facts; it can link back to past
   notes. `validate.mjs` is the **SOLE pre-publish gate** (no human in the loop): it hard-fails
-  on any private blocklist identifier, off-allowlist URL, email/@handle, or dead internal link,
-  no-ops a thin week, and writes the markdown. Locked by
+  on any private blocklist identifier, off-allowlist URL, email/@handle, dead internal link, or
+  hype term VOICE.md bans **by name** (plus exclamation marks/emoji — each exempt when quoted
+  from a fact the drafter was given), no-ops a thin week, and writes the markdown. That lexicon
+  gate covers only VOICE.md's closed, enumerated list; the softer promotional framing it can't
+  regex ("significant", "solidifies", benefit clauses bolted onto a fact) is handled by
+  `draft.mjs`'s prompt and the `review/clear` gate — do not widen the regex into ordinary
+  English, it will start rejecting whole weeks. Locked by
   `validate.test.mjs` (run via `npm test` in CI). Instead of pushing to main, the workflow
   commits the note to a branch `field-notes/<slug>` and opens an `auto-land`-labeled PR via
   `AUTOLAND_PAT` (so CI + `review/clear` run); the gated auto-land sweeper merges it once green
