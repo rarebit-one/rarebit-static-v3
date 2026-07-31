@@ -33,3 +33,9 @@ npm-debug.log*
 # Set by an actor after it opens a PR, so the self-heal step leaves the claim in
 # place (issue closes on merge). Must never land in a drift-actor `git add -A`.
 /pr-opened.flag
+
+# Worktrees (workspace worktree-only workflow). Both conventions are in use
+# across this estate — .worktrees/ for developer trees, .claude/worktrees/ for
+# agent trees — so ignore both, or whichever is missing reports the tree dirty.
+.worktrees/
+.claude/worktrees/
