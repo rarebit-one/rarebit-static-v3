@@ -77,10 +77,21 @@ jobs:
     name: Production
     needs: check-tracking
     if: ${{ needs.check-tracking.outputs.has_app_id == 'true' }}
-    uses: ./.github/workflows/track-do-deployment.yml
+    # Shared org tracker (rarebit-one/.github#93). SHA-pinned rather than @main:
+    # one edit there now reaches five repos, and the dangerous failure mode is a
+    # false green that silently removes a deploy signal.
+    uses: rarebit-one/.github/.github/workflows/reusable-track-do-deployment.yml@9c5d2173505aca5c7d0eaba424d2cb13846cf462 # main
     with:
       environment: production
       environment_url: https://rarebit.one
+      # DELIBERATELY EMPTY — this repo has never had a post-ACTIVE reachability
+      # gate (its local tracker had no health_path input at all), and the shared
+      # tracker skips the probe entirely on an empty value. Setting a path here
+      # would ADD a new blocking gate that could red an otherwise healthy static
+      # deploy. Both are spelled out rather than left to the default so the
+      # absence is a stated decision, not an oversight.
+      health_path: ""
+      readiness_path: ""
       # Under workflow_run, github.sha is this workflow file's commit, not the
       # triggering CI run's commit — use the workflow_run head_sha.
       expected_commit_sha: ${{ github.event.workflow_run.head_sha }}
