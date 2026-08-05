@@ -11,6 +11,10 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: weekly-rebuild
+  cancel-in-progress: false
+
 jobs:
   rebuild:
     runs-on: ubuntu-latest
