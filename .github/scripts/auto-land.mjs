@@ -12,13 +12,20 @@
 //     (advisory "Lighthouse (advisory)" is ignored — an UNSTABLE rollup caused
 //      only by it must still be allowed)
 //
-// Reads use GH_TOKEN (GITHUB_TOKEN). The MERGE uses AUTOLAND_PAT so downstream
-// push/workflow_run jobs (deploy.yml) fire.
+// Reads use GH_TOKEN (GITHUB_TOKEN). The MERGE uses AUTOLAND_MERGE_TOKEN, which
+// auto-land.yml resolves by the precedence App -> AUTOLAND_PAT -> GITHUB_TOKEN
+// so downstream push/workflow_run jobs (deploy.yml) fire. AUTOLAND_TOKEN_MODE
+// names the rung in use; the GITHUB_TOKEN rung is a degradation that fires no
+// push event, so this script re-announces it loudly whenever it actually lands
+// something under it — a degraded run must never read as a clean success.
 
+import { appendFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 
-const { GH_TOKEN, AUTOLAND_PAT, AUTOLAND_LIVE } = process.env;
+const { GH_TOKEN, AUTOLAND_MERGE_TOKEN, AUTOLAND_TOKEN_MODE, AUTOLAND_LIVE } = process.env;
 const LIVE = AUTOLAND_LIVE === "true";
+// The workflow sets this to "GITHUB_TOKEN (degraded)" on the last-resort rung.
+const DEGRADED = (AUTOLAND_TOKEN_MODE || "").startsWith("GITHUB_TOKEN");
 // GITHUB_REPOSITORY ("owner/repo") is always set by Actions on every event type,
 // including `schedule` where github.event.repository is absent. Prefer it.
 const REPO_SLUG = process.env.GITHUB_REPOSITORY || `${process.env.OWNER}/${process.env.REPO}`;
@@ -39,6 +46,17 @@ function ghJson(args) {
 
 function log(msg) {
   console.log(msg);
+}
+
+// Append to the run summary when running under Actions; a no-op locally.
+function summary(msg) {
+  const file = process.env.GITHUB_STEP_SUMMARY;
+  if (!file) return;
+  try {
+    appendFileSync(file, `${msg}\n`);
+  } catch {
+    /* the summary is best-effort; never fail a sweep over it */
+  }
 }
 
 // --- rollup evaluation -----------------------------------------------------
@@ -116,12 +134,22 @@ function hasTrustedStop(pr) {
 
 // --- main ------------------------------------------------------------------
 
-if (!AUTOLAND_PAT && LIVE) {
-  log("AUTOLAND_LIVE is true but AUTOLAND_PAT is not set — cannot merge. No-op (nothing landed).");
+// A missing write credential degrades this actuator to a LOUD no-op — never a
+// crash, and never a partial merge. (In practice the workflow always resolves
+// at least GITHUB_TOKEN, so this only trips if the env is wired up wrong.)
+if (!AUTOLAND_MERGE_TOKEN && LIVE) {
+  log(
+    "::warning::AUTOLAND_LIVE is true but no merge token was resolved — cannot merge. No-op (nothing landed).",
+  );
+  summary(
+    "⚠️ **Auto-land no-op** — `AUTOLAND_LIVE` is true but no merge token was resolved, so nothing was landed.",
+  );
   process.exit(0);
 }
 
-log(`Auto-land sweep on ${REPO_SLUG} — mode: ${LIVE ? "LIVE" : "DRY-RUN"}`);
+log(
+  `Auto-land sweep on ${REPO_SLUG} — mode: ${LIVE ? "LIVE" : "DRY-RUN"}; merge token: ${AUTOLAND_TOKEN_MODE || "unknown"}`,
+);
 
 let prs = [];
 try {
@@ -147,7 +175,7 @@ if (prs.length === 0) {
   process.exit(0);
 }
 
-let landed = 0;
+const landedPrs = [];
 for (const pr of prs) {
   const labels = new Set((pr.labels || []).map((l) => l.name));
   const tag = `#${pr.number} (${pr.headRefName})`;
@@ -187,7 +215,7 @@ for (const pr of prs) {
 
   try {
     gh(["pr", "merge", String(pr.number), "--repo", REPO_SLUG, "--squash", "--delete-branch"], {
-      token: AUTOLAND_PAT,
+      token: AUTOLAND_MERGE_TOKEN,
     });
     // Comment with the default token (PAT also works; either is fine).
     try {
@@ -204,10 +232,26 @@ for (const pr of prs) {
       /* comment is best-effort */
     }
     log(`${tag}: LANDED (squash + delete-branch).`);
-    landed += 1;
+    landedPrs.push(pr.number);
   } catch (err) {
     log(`${tag}: merge FAILED — ${err.message}`);
   }
 }
 
+const landed = landedPrs.length;
 log(`Sweep done. ${LIVE ? `Landed ${landed} PR(s).` : "Dry-run — nothing merged."}`);
+
+// Landing anything on the GITHUB_TOKEN rung means the merge fired no push
+// event, so deploy.yml/sentry-release.yml did not run for it. Say so where it
+// cannot be missed — the workflow already warned before the sweep, but this is
+// the line that names the commits actually affected.
+if (LIVE && landed > 0 && DEGRADED) {
+  const list = landedPrs.map((n) => `#${n}`).join(", ");
+  log(
+    `::warning::Landed ${landed} PR(s) (${list}) using GITHUB_TOKEN — GitHub emits no push event for it, so deploy.yml and sentry-release.yml did NOT run for these merges. The site will not deploy until someone pushes to main or re-runs the deploy manually.`,
+  );
+  summary(
+    `⚠️ **Landed ${landed} PR(s) (${list}) on the degraded \`GITHUB_TOKEN\` rung — downstream deploys did NOT fire.** ` +
+      "The merges emitted no `push` event, so `deploy.yml` and `sentry-release.yml` did not run and the site is NOT deployed for this change. Restore the App token (or `AUTOLAND_PAT`) and re-run the deploy manually.",
+  );
+}

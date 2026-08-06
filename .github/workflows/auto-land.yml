@@ -6,9 +6,36 @@ name: Auto-land
 #
 # A PR auto-merges (squash + delete branch) once it is reviewed + green, with NO
 # human merge step. Eligibility keys on the `auto-land` LABEL, not author
-# identity — the merge is performed with AUTOLAND_PAT (a real user token), so
-# downstream push/workflow_run jobs (deploy.yml) fire. GITHUB_TOKEN-performed
-# merges do NOT trigger those, which is why the PAT is required.
+# identity.
+#
+# ---------------------------------------------------------------------------
+# WHY THE MERGE NEEDS A NON-AMBIENT TOKEN
+# ---------------------------------------------------------------------------
+# GitHub deliberately does NOT emit workflow-triggering events for actions
+# performed with the automatic `GITHUB_TOKEN` — the documented loop-prevention
+# rule. A merge performed with it fires NO `push` event, so `deploy.yml` and
+# `sentry-release.yml` never run for the landed commit — silently, with green
+# checks throughout. The merge must therefore be attributed to a non-ambient
+# identity: a GitHub App installation token or a real-user PAT.
+#
+# ---------------------------------------------------------------------------
+# TOKEN PRECEDENCE — App → AUTOLAND_PAT → GITHUB_TOKEN
+# ---------------------------------------------------------------------------
+#   1. `rarebit-one` App installation token (org var RELEASE_BOT_CLIENT_ID +
+#      org secret RELEASE_BOT_PRIVATE_KEY, both visibility "All repositories").
+#      The App is installed on every repo in the org and holds
+#      `contents: write` + `pull_requests: write` — exactly what the merge
+#      needs. It NEVER EXPIRES, which is the point: this rung retires the
+#      dependency on a PAT that lapses (rarebit-sre#153).
+#   2. `AUTOLAND_PAT` — retained as the middle rung, not deleted, so this
+#      sweeper still lands push-firing merges if the App is ever uninstalled
+#      here or the mint fails. It is no longer required for normal operation.
+#   3. `GITHUB_TOKEN` — LAST-RESORT DEGRADATION ONLY. It merges, but fires no
+#      push event, so it degrades LOUDLY: a `::warning::` plus a job-summary
+#      block naming the workflows that will NOT fire. A silent fallback here is
+#      the exact failure class this precedence exists to delete — a degraded run
+#      must never look like a clean success.
+# The rung actually used is recorded in the job summary on EVERY run.
 #
 # DRY-RUN by default: unless repo variable AUTOLAND_LIVE == "true", the sweeper
 # logs "would land #N" and merges nothing. This lets us ship the sweeper safely
@@ -49,15 +76,85 @@ jobs:
     env:
       # gh CLI default token — used for READS (listing PRs, comments, rollup).
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # Real-user PAT — used ONLY for the merge, so downstream CI/deploy fire.
-      AUTOLAND_PAT: ${{ secrets.AUTOLAND_PAT }}
       AUTOLAND_LIVE: ${{ vars.AUTOLAND_LIVE }}
       OWNER: ${{ github.repository_owner }}
       REPO: ${{ github.event.repository.name || github.repository }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Mint a release-bot App token for the merge
+        id: app_token
+        # `continue-on-error` is load-bearing, not defensive dressing: this
+        # action FAILS the step when the client-id or private key is missing or
+        # the App is not installed here. Without it, an absent credential would
+        # take the whole sweeper down instead of dropping gracefully to the next
+        # rung. On failure `steps.app_token.outputs.token` is empty, which is
+        # exactly what the precedence chain below reads.
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          # `client-id:`, not `app-id:` — RELEASE_BOT_CLIENT_ID holds the App's
+          # Client ID (Iv23li…), not its numeric App ID.
+          client-id: ${{ vars.RELEASE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+          # Scoped to exactly what the squash merge needs. The App holds more
+          # (issues, workflows); an installation token is capped down to what is
+          # requested here, so the merge cannot reach beyond landing a PR.
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Resolve the merge token (App → AUTOLAND_PAT → GITHUB_TOKEN)
+        id: token
+        # Runs unconditionally so the rung is recorded on every run, including
+        # dry-run sweeps that land nothing. `secrets` is only readable from a
+        # step-level `env:`/`with:` (never a job `if:`), and each comparison
+        # yields a plain "true"/"false" — no token is interpolated here, so
+        # nothing reaches the log.
+        env:
+          HAS_APP: ${{ steps.app_token.outputs.token != '' }}
+          HAS_PAT: ${{ secrets.AUTOLAND_PAT != '' }}
+        run: |
+          set -euo pipefail
+          if [ "$HAS_APP" = "true" ]; then
+            echo "mode=release-bot App" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Auto-land merge token"
+              echo ""
+              echo "✅ Using the \`rarebit-one\` **App installation token** — the merge is attributed to the App, not the ambient token, so downstream \`push\` / \`workflow_run\` workflows (\`deploy.yml\`, \`sentry-release.yml\`) WILL fire."
+            } >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$HAS_PAT" = "true" ]; then
+            echo "mode=AUTOLAND_PAT" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Auto-land merge token"
+              echo ""
+              echo "✅ Using \`AUTOLAND_PAT\` — the merge is attributed to a real user, so downstream \`push\` / \`workflow_run\` workflows (\`deploy.yml\`, \`sentry-release.yml\`) WILL fire."
+              echo ""
+              echo "_Note: the App token was not available. Expected only if the \`rarebit-one\` App is uninstalled here or the mint failed — check the previous step._"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "mode=GITHUB_TOKEN (degraded)" >> "$GITHUB_OUTPUT"
+            echo "::warning::Neither the release-bot App token nor AUTOLAND_PAT is available — falling back to GITHUB_TOKEN. GitHub emits no workflow-triggering events for GITHUB_TOKEN actions, so any merge this sweep performs will fire NO push event: deploy.yml and sentry-release.yml will NOT run for it. Check that the rarebit-one App is installed on this repo and that RELEASE_BOT_CLIENT_ID (org variable) and RELEASE_BOT_PRIVATE_KEY (org secret) are visible to it."
+            {
+              echo "### Auto-land merge token"
+              echo ""
+              echo "⚠️ **DEGRADED — no App token and no \`AUTOLAND_PAT\`; falling back to \`GITHUB_TOKEN\`.**"
+              echo ""
+              echo "Any merge performed by this sweep will be attributed to \`github-actions[bot]\` and will emit **no \`push\` event**."
+              echo "Downstream \`push\`-triggered and \`workflow_run\`-chained workflows — \`deploy.yml\`, \`sentry-release.yml\` — **will NOT fire**, so the site will not deploy for anything landed here."
+              echo ""
+              echo "Check, in order:"
+              echo "1. the \`rarebit-one\` App is installed on this repository;"
+              echo "2. \`RELEASE_BOT_CLIENT_ID\` (org variable) and \`RELEASE_BOT_PRIVATE_KEY\` (org secret) are both visible to it;"
+              echo "3. the mint step above did not fail."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Sweep
+        env:
+          # The MERGE — and only the merge — uses the elevated token. Reads keep
+          # the ambient GH_TOKEN from the job env.
+          AUTOLAND_MERGE_TOKEN: ${{ steps.app_token.outputs.token || secrets.AUTOLAND_PAT || secrets.GITHUB_TOKEN }}
+          AUTOLAND_TOKEN_MODE: ${{ steps.token.outputs.mode }}
         run: node .github/scripts/auto-land.mjs
 
   # Crash-heartbeat (house pattern, mirrors the actuator sweeps). The beat's own
