@@ -32,11 +32,22 @@ async function fetchJson<T>(url: string, headers: Record<string, string> = {}): 
 const GITHUB_ACCEPT = { Accept: "application/vnd.github+json" };
 
 // The client-work replay feed (nightly pipeline → DO Spaces). The site reads
-// this at build for the SSR digest line; the client-side 24h-delayed reveal
-// UI is a follow-up. Channel is baked at build via PUBLIC_FARM_FEED_CHANNEL
-// (default "staging" until the pipeline is trusted; flip to "live" in prod).
-const FARM_FEED_CHANNEL = import.meta.env.PUBLIC_FARM_FEED_CHANNEL ?? "staging";
-export const FARM_FEED_URL = `https://rarebit-farm-feed.sgp1.digitaloceanspaces.com/${FARM_FEED_CHANNEL}/farm-replay.json`;
+// this at build for the SSR digest line, and the Operations client script
+// re-reads it in the browser for the 24h-delayed reveal.
+//
+// There is ONE feed and it is public. The pipeline uploads with
+// `--acl public-read`, so an object is world-readable the instant it lands —
+// there is no unpublished holding area and no promotion step. (A
+// `staging`/`live` channel split used to be documented here as "staging until
+// trusted"; it never isolated anything, because both prefixes were written
+// public-read and the site read `staging` by default. See issue #344.)
+//
+// The pre-publication gate is `scripts/farm-feed/validate.mjs` — it hard-fails
+// on any leaked identifier before a byte reaches the bucket, and it is locked
+// by `validate.test.mjs`. That is the control. Do not weaken it, and do not
+// reintroduce a channel prefix as if it were one.
+export const FARM_FEED_URL =
+  "https://rarebit-farm-feed.sgp1.digitaloceanspaces.com/farm-replay.json";
 
 export type FarmTotals = { runs: number; systems: number; greenPct: number };
 
