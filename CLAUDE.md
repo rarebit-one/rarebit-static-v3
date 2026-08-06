@@ -66,8 +66,14 @@ npm run preview  # serve dist/
   sees raw data or emits identifiers; `validate.mjs` is a hard gate that **exit-1s on any
   blocklisted name, URL, email, @handle, or number absent from the sanitized totals**, then
   assembles the artifact. Output publishes (`aws s3 cp`) to a DO Spaces bucket
-  (`rarebit-farm-feed`, channel from the `FARM_FEED_CHANNEL` repo var — `staging` until trusted,
-  then `live`). The site reads it at build (`farmReplay()` → SSR digest line in Operations, with
+  (`rarebit-farm-feed`) at a **single public path** — `farm-replay.json` plus
+  `archive/<YYYY-MM-DD>.json`, both uploaded `--acl public-read`, so **everything the pipeline
+  writes is published the instant it lands**. There is no holding area and no promotion step:
+  `validate.mjs` runs before the upload and is the sole pre-publication gate. (A
+  `staging`/`live` channel split once claimed to be one — "staging until trusted" — but both
+  prefixes were public-read and the site read `staging` by default, so it gated nothing;
+  removed in #344. Do not reintroduce a path prefix as a trust boundary.) The site reads it at
+  build (`farmReplay()` → SSR digest line in Operations, with
   a freshness guard: only shown if the file's `window` is within the last two days SGT) and in the
   browser: the Operations client script replays each event into the receipts list on a fixed
   real-time + 24h delay (`Δ24h` rows), refreshing the digest and hiding it when the artifact is
