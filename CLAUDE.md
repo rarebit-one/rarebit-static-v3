@@ -170,9 +170,15 @@ happens with zero human or agent intervention. Tracked in issue #29.
   `no-auto-land`, has no trusted `STOP` comment after the latest commit, is `MERGEABLE`, and has
   ALL required contexts green: **`Type-check & build`**, **`Link check`**, **`review/clear`**
   (advisory **`Lighthouse (advisory)`** is intentionally NOT required). Eligibility keys on the
-  **label**, not author identity. Merges (squash + delete-branch) use `AUTOLAND_PAT` (a real-user
-  token) so downstream CI/deploy `workflow_run` jobs fire. **DRY-RUN unless repo var
-  `AUTOLAND_LIVE == "true"`** — until flipped, it logs `would land #N` and merges nothing.
+  **label**, not author identity. Merges (squash + delete-branch) use a **non-ambient** token so
+  downstream CI/deploy `workflow_run` jobs fire, resolved by the precedence **`rarebit-one` App
+  installation token → `AUTOLAND_PAT` → `GITHUB_TOKEN`**. The App rung (org var
+  `RELEASE_BOT_CLIENT_ID` + org secret `RELEASE_BOT_PRIVATE_KEY`) never expires and is the normal
+  path; the PAT is a retained fallback, no longer required. The `GITHUB_TOKEN` rung fires **no
+  `push` event**, so it is a last-resort degradation that announces itself with a `::warning::`
+  and a job-summary block naming the deploys that will not run — never a silent success.
+  **DRY-RUN unless repo var `AUTOLAND_LIVE == "true"`** — until flipped, it logs `would land #N`
+  and merges nothing.
 - **`scripts/autoland/enable.sh`** — the ONE place repo-settings changes are described (labels +
   `main` branch protection requiring the three contexts above, `required_pull_request_reviews:
   null`, `required_conversation_resolution: true`). Run once by a human after `AUTOLAND_PAT` is
