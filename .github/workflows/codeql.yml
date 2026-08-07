@@ -1,0 +1,44 @@
+name: CodeQL
+
+# Copied from the estate's JS/TS house shape (sidekick-labs/sidekick-ui), which is
+# the pattern for public TypeScript repos here. The Ruby gems run a byte-identical
+# `codeql.yml` of their own with `languages: ruby`.
+#
+# Added because CodeQL is FREE on public repos and licensed (GHAS) on private ones,
+# and this repo is public. Measured 2026-08-07: of the estate's 17 public repos, 13
+# ran CodeQL and 4 did not — this was one of them. Every private repo returns
+# `403 Code Security must be enabled`, so none runs it and none pays for it.
+#
+# Language choice is measured, not assumed: GitHub reports this repo as JavaScript
+# 259 KB / Astro 123 KB / TypeScript 20 KB. CodeQL has no Astro extractor, but Astro
+# files embed JS/TS which the javascript-typescript extractor picks up.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (JavaScript/TypeScript)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: github/codeql-action/init@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
+        with:
+          category: "/language:javascript-typescript"
