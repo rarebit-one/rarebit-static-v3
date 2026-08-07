@@ -47,15 +47,30 @@ name: Auto-land
 # by Lighthouse must still be allowed to land.
 
 on:
-  check_suite:
+  # `check_suite` and `status` used to be here and were DEAD — 1 run and 0 runs
+  # respectively over 1,721 lifetime runs. Same loop-prevention rule documented
+  # above: GitHub does not dispatch check_suite/status events for check suites
+  # and statuses created by Actions' own GITHUB_TOKEN, and every gating context
+  # in this repo is exactly that. So no event fired when a PR turned green, and
+  # the label-then-walk-away case (label applied while checks are still red)
+  # could ONLY be caught by the cron. `workflow_run` is the trigger that DOES
+  # fire for Actions-produced workflows; these three produce the whole required
+  # set — Type-check & build (CI), Link check (Site quality), review/clear
+  # (Review verdict).
+  workflow_run:
+    workflows: [CI, Site quality, Review verdict]
     types: [completed]
   pull_request_review:
     types: [submitted]
-  status:
   pull_request_target:
     types: [labeled]
   schedule:
-    - cron: "*/30 * * * *" # safety net in case an event is missed
+    # Pure safety net now that the green transition is genuinely event-driven.
+    # Was */30, which billed 2 min/run x ~28 runs/day to land nothing: 12
+    # sampled scheduled runs all logged "No open PRs." or "Landed 0 PR(s)",
+    # and both recent auto-land merges were landed by the label event or by a
+    # human, never by the cron.
+    - cron: "23 */6 * * *"
   workflow_dispatch:
 
 permissions:
