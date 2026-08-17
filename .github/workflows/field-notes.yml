@@ -89,13 +89,16 @@ jobs:
           # The slug is usually unique, but guard against a same-day re-run
           # colliding on `git checkout -b` by appending the run id.
           branch="field-notes/${slug}-${GITHUB_RUN_ID}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$branch"
-          git add src/content/field-notes
-          git commit -m "Field notes: weekly entry (${slug})"
-          # Push with AUTOLAND_PAT (the checkout token) so CI + review-verdict run.
-          git push --set-upstream origin "$branch"
+          # Create the branch + commit through the API rather than `git commit`.
+          # `main` requires signed commits, and a commit made on a runner has no
+          # key, so a git-made commit leaves the PR permanently `blocked` with
+          # every required check GREEN and nothing red to point at. GraphQL
+          # createCommitOnBranch is the only API that signs (the REST contents
+          # API does not). Commits as AUTOLAND_PAT's user, so the push still
+          # triggers CI + review-verdict on the opened PR.
+          base_sha="$(git rev-parse HEAD)"
+          node scripts/field-notes/publish-commit.mjs \
+            "$branch" "$base_sha" "$note_path" "Field notes: weekly entry (${slug})"
           # Ensure the `auto-land` label exists so `gh pr create --label` can't
           # fail the run if the label was never bootstrapped (enable.sh).
           gh label create auto-land --color "0E8A16" --description "Opt this PR into gated auto-merge once green + review-clear" --force || true
