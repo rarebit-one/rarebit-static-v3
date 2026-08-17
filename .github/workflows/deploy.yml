@@ -80,7 +80,7 @@ jobs:
     # Shared org tracker (rarebit-one/.github#93). SHA-pinned rather than @main:
     # one edit there now reaches five repos, and the dangerous failure mode is a
     # false green that silently removes a deploy signal.
-    uses: rarebit-one/.github/.github/workflows/reusable-track-do-deployment.yml@60a8beebb401ded077c37a742420c66b74aabf9f # main
+    uses: rarebit-one/.github/.github/workflows/reusable-track-do-deployment.yml@6ec1c6c212e15e14fc29e07882c9ea365f20e54f # main
     with:
       environment: production
       environment_url: https://rarebit.one
