@@ -16,7 +16,10 @@ concurrency:
 jobs:
   build:
     name: Type-check & build
-    runs-on: ubuntu-latest
+    # broker → static homelab → GitHub-hosted. Inert until
+    # RUNNER_LABEL_BROKER is set; deleting that variable reverts to
+    # exactly what ran before.
+    runs-on: ${{ vars.RUNNER_LABEL_BROKER || vars.RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
