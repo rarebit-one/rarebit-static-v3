@@ -49,3 +49,8 @@ agents triage. Small team. The site is the demo.
 ## Update (2026-06-13)
 
 When this was written, humans clicked merge. Since then, reviewed PRs auto-land — see [/how-we-work](/how-we-work).
+
+
+## Update (2026-09-13)
+
+When this was written, humans clicked merge. Since then, reviewed PRs auto-land — see [/how-we-work](/how-we-work).
