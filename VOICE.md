@@ -36,8 +36,7 @@ Hard rules, always:
   "revolutionary", "game-changing", "world-class"). No exclamation marks. No emoji.
 - British/neutral spelling.
 - Ground every claim in the facts you are given. Never invent a metric, name, date, or link.
-- Prefer the concrete verb to the abstract noun: agents run queues, monitor CI pipelines to completion, open
-  PRs, and ship; humans direct, review, and decide.
+- Prefer the concrete verb to the abstract noun: agents act, run queues, monitor CI pipelines to completion, open PRs, and ship; humans direct, review, and decide.
 <!-- VOICE-HEADER:END -->
 
 ## Lexicon
@@ -59,6 +58,7 @@ next-generation; disrupt; solution (as filler). Anything a generic SaaS landing 
 The voice-evolution workflow appends dated, bounded entries here. Newest first.
 
 <!-- VOICE-CHANGELOG:START -->
+- 2026-09-07 — Adjusted the voice header to emphasise agents acting directly, reflecting recent trends in AI's ability to safely operate physical devices.
 - 2026-08-31 — Updated Lexicon to emphasise 'agents' over 'queues', reflecting the AI trend towards autonomous action.
 - 2026-08-03 — Replaced 'self-aware' with 'responsive' to reflect current AI developments.
 - 2026-07-20 — Streamlined language in the self-awareness section to reflect subtlety and context clarity.
