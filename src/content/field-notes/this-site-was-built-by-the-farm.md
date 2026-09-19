@@ -49,3 +49,8 @@ agents triage. Small team. The site is the demo.
 ## Update (2026-06-13)
 
 When this was written, humans clicked merge. Since then, reviewed PRs auto-land — see [/how-we-work](/how-we-work).
+
+
+## Update (2026-09-20)
+
+When this note was published, humans approved the merges. The site now auto-lands reviewed PRs, signalling a shift as captured in our [build logs](https://github.com/rarebit-one/rarebit-static-v3/pulls?q=is%3Apr+is%3Amerged).
