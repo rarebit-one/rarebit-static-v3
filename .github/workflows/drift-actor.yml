@@ -163,10 +163,24 @@ jobs:
           if [ -n "$issue" ]; then close_line="
 
           Closes #${issue}."; fi
+          # A roadmap `status:`/`date:` flip (e.g. "In the works" → "Live now") is
+          # a public product claim, not stale copy: the validator can prove the
+          # edit is well-formed but not that the claim is true. Hold those for an
+          # owner — `hold` is auto-land's existing opt-out, so nothing merges
+          # until a human removes it. Plain copy edits keep landing unattended.
+          hold_args=()
+          hold_line=""
+          if git diff --cached -U0 -- src/data/site.ts | grep -qE '^[-+][[:space:]]*(status|date):'; then
+            gh label create hold --color "B60205" --description "Keep auto-land off this PR until a human removes it" --force || true
+            hold_args=(--label hold)
+            hold_line="
+
+          **Held for an owner:** this changes a roadmap \`status\`/\`date\`, which is a public product claim. Remove the \`hold\` label to let auto-land merge it, or close the PR to keep the current copy."
+          fi
           pr_url="$(gh pr create \
             --title "Site freshness: weekly drift sweep" \
-            --body "Automated weekly drift sweep, consumed from an open \`drift\` issue. Bounded copy edits to stale static claims, and append-only addenda on drifted field notes (original prose preserved byte-for-byte by \`scripts/freshness/validate.mjs\`). Opened for auto-land review.${close_line}" \
-            --label auto-land \
+            --body "Automated weekly drift sweep, consumed from an open \`drift\` issue. Bounded copy edits to stale static claims, and append-only addenda on drifted field notes (original prose preserved byte-for-byte by \`scripts/freshness/validate.mjs\`). Opened for auto-land review.${hold_line}${close_line}" \
+            --label auto-land "${hold_args[@]}" \
             --head "$BRANCH")"
           echo "outcome=pr" >> "$GITHUB_OUTPUT"
           echo "pr_url=${pr_url}" >> "$GITHUB_OUTPUT"
