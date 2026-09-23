@@ -139,8 +139,8 @@ export const roadmap = [
     id: "2",
     title: "Self-healing pipelines",
     text: "Automations that detect their own failures, retry with context, and summarize the incident when they can't.",
-    date: "In the works",
-    status: "progress",
+    date: "Live now",
+    status: "done",
     imageUrl: "/images/roadmap/image-3.webp",
   },
   {
