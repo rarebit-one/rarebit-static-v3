@@ -94,6 +94,7 @@ jobs:
         id: open_pr
         env:
           GH_TOKEN: ${{ secrets.AUTOLAND_PAT }}
+          AUTOLAND_PAT: ${{ secrets.AUTOLAND_PAT }} # read by scripts/lib/publish-commit.mjs
         run: |
           # The claimed issue number (written by act.mjs), if any.
           issue=""
@@ -114,12 +115,13 @@ jobs:
           fi
           # Append the run id so a same-day re-run can't collide on the branch (#55).
           branch="voice/$(date +%Y-%m-%d)-${GITHUB_RUN_ID}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$branch"
-          git add VOICE.md
-          git commit -m "Voice: weekly evolution"
-          git push --set-upstream origin "$branch"
+          # Create the branch + commit through the API rather than `git commit`.
+          # `main` requires signed commits and a runner has no key, so a git-made
+          # commit leaves the PR permanently `blocked` with every required check
+          # GREEN (#384). GraphQL createCommitOnBranch is the only API that signs.
+          # Commits as AUTOLAND_PAT's user, so CI + review/clear still trigger.
+          node scripts/lib/publish-commit.mjs \
+            "$branch" "$(git rev-parse HEAD)" "Voice: weekly evolution" VOICE.md
           # Ensure the `auto-land` label exists so `gh pr create --label` can't fail
           # the run if the label was never bootstrapped (enable.sh) (#55).
           gh label create auto-land --color "0E8A16" --description "Opt this PR into gated auto-merge once green + review-clear" --force || true

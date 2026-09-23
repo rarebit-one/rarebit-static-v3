@@ -125,8 +125,8 @@ npm run preview  # serve dist/
   `validate.test.mjs` (run via `npm test` in CI). Instead of pushing to main, the workflow
   commits the note to a branch `field-notes/<slug>` and opens an `auto-land`-labeled PR via
   `AUTOLAND_PAT` (so CI + `review/clear` run); the gated auto-land sweeper merges it once green
-  (see "Gated auto-land" below). **The commit is made by `scripts/field-notes/publish-commit.mjs`
-  (GraphQL `createCommitOnBranch`), never by `git commit` — `main` requires signed commits and a
+  (see "Gated auto-land" below). **The commit is made by `scripts/lib/publish-commit.mjs`
+  (GraphQL `createCommitOnBranch`) — shared with `drift-actor.yml` and `voice-actor.yml` — never by `git commit` — `main` requires signed commits and a
   runner has no key, so a git-made commit leaves the PR `blocked` with every required check GREEN
   and nothing red to point at. GraphQL is the only GitHub API that signs; the REST contents API
   does NOT. Do not "simplify" this back to `git commit && git push`.** Secrets (user-created): `FEED_GITHUB_PAT`,
