@@ -24,9 +24,13 @@ export function hasOpenAIKey() {
  * @param {string}  opts.prompt     user prompt
  * @param {number} [opts.maxTokens] max_completion_tokens (default 1024)
  * @param {boolean}[opts.json]      request a JSON object response
+ * @param {number} [opts.temperature] sampling temperature. Omitted by default,
+ *                                   so the API default applies (unchanged for
+ *                                   existing callers); pass 0 for pipelines that
+ *                                   must quote their input exactly.
  * @returns {Promise<string>}
  */
-export async function callLLM({ system, prompt, maxTokens = 1024, json = false }) {
+export async function callLLM({ system, prompt, maxTokens = 1024, json = false, temperature }) {
   const res = await fetch(ENDPOINT, {
     method: "POST",
     headers: {
@@ -41,6 +45,7 @@ export async function callLLM({ system, prompt, maxTokens = 1024, json = false }
       ],
       max_completion_tokens: maxTokens,
       ...(json ? { response_format: { type: "json_object" } } : {}),
+      ...(typeof temperature === "number" ? { temperature } : {}),
     }),
   });
 

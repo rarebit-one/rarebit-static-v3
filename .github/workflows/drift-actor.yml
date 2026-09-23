@@ -101,6 +101,22 @@ jobs:
           fi
           node scripts/freshness/validate.mjs state.json patch.json
 
+      # Diagnostics (#610): when gather/draft/validate fails, keep the scratch
+      # JSON the run produced so the rejected patch can be compared against the
+      # state the model was given. Everything in it is public repo content plus
+      # the model's proposal. Missing files are fine (a step may not have run).
+      - name: Upload drift scratch files (on failure)
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: drift-actor-scratch-${{ github.run_id }}
+          path: |
+            claim.json
+            state.json
+            patch.json
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Open an auto-land PR (if the sweep changed anything)
         id: open_pr
         env:

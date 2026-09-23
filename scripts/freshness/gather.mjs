@@ -12,7 +12,10 @@
 //   - pages: the page inventory from src/pages/ (used by the validator to
 //     reject dead internal links in any proposed addendum).
 //   - siteClaims: the checkable static copy from src/data/site.ts — the
-//     benefits text, roadmap titles+statuses, and collaboration blurbs.
+//     benefits text, roadmap titles+statuses, and collaboration blurbs, each
+//     kept verbatim as written in the file.
+//   - siteSource: the full, verbatim text of src/data/site.ts. Every copyEdit
+//     `find` must be copied from it character for character (#610).
 //   - notes: every field note (slug, frontmatter, FULL body). The drafter may
 //     propose an APPENDED addendum for a drifted note; the validator preserves
 //     the original body byte-for-byte.
@@ -27,6 +30,7 @@
 // Output: writes state.json to argv[2] (default ./state.json).
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 
 const ORG = "rarebit-one";
 const TOKEN = process.env.FEED_GITHUB_PAT || process.env.GITHUB_TOKEN;
@@ -73,30 +77,44 @@ function readPages() {
 
 // --- SITE CLAIMS — checkable static copy from src/data/site.ts -------------
 // We do NOT evaluate the TS; we read it as text and pull the human-facing
-// strings the drafter may need to correct. Keeping the exact `text:`/`title:`
-// substrings means a copyEdit's `find` can be matched verbatim downstream.
-function readSiteClaims() {
-  const path = "src/data/site.ts";
-  if (!existsSync(path)) return {};
-  const src = readFileSync(path, "utf8");
+// strings the drafter may need to correct. Each literal is kept EXACTLY as it
+// appears between the quotes in the file (escapes are NOT decoded), so any of
+// them is a valid verbatim `find` for validate.mjs.
+export const SITE_FILE = "src/data/site.ts";
 
-  // Pull every `title:` / `text:` / `status:` / `date:` string literal. We keep
-  // them as plain strings (the verbatim copy) so the drafter can quote them and
-  // the validator can match `find` against the file.
+/** Pure: pull the `title:` / `text:` / `description:` / `status:` / `date:`
+ *  string literals out of site.ts source, verbatim. */
+export function extractSiteClaims(src) {
   const grab = (key) => {
     const out = [];
-    const re = new RegExp(`${key}:\\s*"((?:[^"\\\\]|\\\\.)*)"`, "g");
+    const re = new RegExp(`\\b${key}:\\s*"((?:[^"\\\\]|\\\\.)*)"`, "g");
     let m;
-    while ((m = re.exec(src))) out.push(m[1].replace(/\\"/g, '"'));
+    while ((m = re.exec(src))) out.push(m[1]);
     return out;
   };
 
   return {
     benefitsText: grab("text"),
     titles: grab("title"),
+    descriptions: grab("description"),
     statuses: grab("status"),
     dates: grab("date"),
   };
+}
+
+function readSiteClaims() {
+  if (!existsSync(SITE_FILE)) return {};
+  return extractSiteClaims(readFileSync(SITE_FILE, "utf8"));
+}
+
+// --- SITE SOURCE — the exact text the drafter may edit (#610) ---------------
+// The drafter used to see only the extracted literals and occasionally
+// paraphrased them into a `find` that isn't in the file. Handing it the file
+// verbatim lets it copy `find` character for character; validate.mjs still
+// re-checks every `find` against the file on disk.
+function readSiteSource() {
+  if (!existsSync(SITE_FILE)) return undefined;
+  return { file: SITE_FILE, text: readFileSync(SITE_FILE, "utf8") };
 }
 
 // --- NOTES — slug + frontmatter + FULL body --------------------------------
@@ -159,6 +177,7 @@ async function main() {
   const workflows = readWorkflows();
   const pages = readPages();
   const siteClaims = readSiteClaims();
+  const siteSource = readSiteSource();
   const notes = readNotes();
   const live = await liveFacts();
 
@@ -167,6 +186,7 @@ async function main() {
     workflows,
     pages,
     siteClaims,
+    ...(siteSource ? { siteSource } : {}),
     notes,
     ...(live ? { live } : {}),
   };
@@ -179,7 +199,10 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error(`gather: ${error.message}`);
-  process.exit(1);
-});
+// Run only as a CLI, so the pure helpers above can be imported by tests.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(`gather: ${error.message}`);
+    process.exit(1);
+  });
+}

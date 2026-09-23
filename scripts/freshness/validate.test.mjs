@@ -160,6 +160,29 @@ test("a copyEdit whose find is absent FAILS and writes nothing", () => {
   assert.equal(note, ORIGINAL_NOTE, "note must be untouched on failure");
 });
 
+// --- a rejected find is named in the log (#610) ------------------------------
+test("a rejected find is logged JSON-escaped with its target file", () => {
+  const find = 'Humans approve\tthe "merge".';
+  const { code, stderr } = runValidate({
+    copyEdits: [{ file: "src/data/site.ts", find, replace: "whatever", why: "—" }],
+    addenda: [],
+  });
+  assert.equal(code, 1);
+  assert.ok(stderr.includes('not present verbatim in "src/data/site.ts"'), stderr);
+  assert.ok(stderr.includes(`rejected find: ${JSON.stringify(find)}`), stderr);
+});
+
+test("a long rejected find is truncated in the log", () => {
+  const find = "x".repeat(450);
+  const { code, stderr } = runValidate({
+    copyEdits: [{ file: "src/data/site.ts", find, replace: "whatever", why: "—" }],
+    addenda: [],
+  });
+  assert.equal(code, 1);
+  assert.ok(stderr.includes(`rejected find: ${JSON.stringify("x".repeat(200))}… (truncated; 450 chars)`), stderr);
+  assert.ok(!stderr.includes("x".repeat(201)), "the log must not carry the full find");
+});
+
 // --- off-allowlist URL in an addendum → FAIL --------------------------------
 test("an off-allowlist URL in an addendum FAILS", () => {
   const { code, note } = runValidate({
