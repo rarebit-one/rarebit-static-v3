@@ -97,8 +97,8 @@ jobs:
           # API does not). Commits as AUTOLAND_PAT's user, so the push still
           # triggers CI + review-verdict on the opened PR.
           base_sha="$(git rev-parse HEAD)"
-          node scripts/field-notes/publish-commit.mjs \
-            "$branch" "$base_sha" "$note_path" "Field notes: weekly entry (${slug})"
+          node scripts/lib/publish-commit.mjs \
+            "$branch" "$base_sha" "Field notes: weekly entry (${slug})" "$note_path"
           # Ensure the `auto-land` label exists so `gh pr create --label` can't
           # fail the run if the label was never bootstrapped (enable.sh).
           gh label create auto-land --color "0E8A16" --description "Opt this PR into gated auto-merge once green + review-clear" --force || true
