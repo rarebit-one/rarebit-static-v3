@@ -206,6 +206,13 @@ function isAllowedTarget(file) {
   return false;
 }
 
+// A `find` for a log line: truncated to FIND_LOG_LEN chars, then JSON-escaped.
+const FIND_LOG_LEN = 200;
+function quoteForLog(text) {
+  if (text.length <= FIND_LOG_LEN) return JSON.stringify(text);
+  return `${JSON.stringify(text.slice(0, FIND_LOG_LEN))}… (truncated; ${text.length} chars)`;
+}
+
 // Accumulate edits per file so multiple edits to one file compose.
 const editsByFile = new Map();
 
@@ -229,7 +236,11 @@ for (const e of copyEdits) {
   // `find` must currently exist verbatim, exactly once we apply a single
   // replace (replace the FIRST occurrence; require it be present).
   const idx = content.indexOf(e.find);
-  if (idx === -1) fail(`copyEdit "find" not present verbatim in "${e.file}"`);
+  if (idx === -1) {
+    // Name the rejected text so a failed run can be diagnosed from its log
+    // (#610). JSON-escaped so whitespace/quote differences are visible.
+    fail(`copyEdit "find" not present verbatim in "${e.file}" — rejected find: ${quoteForLog(e.find)}`);
+  }
 
   content = content.slice(0, idx) + e.replace + content.slice(idx + e.find.length);
   editsByFile.set(e.file, content);
