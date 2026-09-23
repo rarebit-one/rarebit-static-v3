@@ -44,7 +44,7 @@ Hard rules, always:
 
 **Reach for:** the farm; agents; receipts; runs; monitors CI pipelines; humans in the loop; the build log; small teams, impossible things; human creativity, amplified.
 
-**Avoid:** synergy; leverage (as a verb); unlock; supercharge; effortless; magic; AI-powered;
+**Avoid:** synergy; leverage (as a verb); unlock; supercharge; effortless; magic; AI-driven;
 next-generation; disrupt; solution (as filler). Anything a generic SaaS landing page would say.
 
 ## Self-awareness, calibrated
@@ -59,6 +59,7 @@ next-generation; disrupt; solution (as filler). Anything a generic SaaS landing 
 The voice-evolution workflow appends dated, bounded entries here. Newest first.
 
 <!-- VOICE-CHANGELOG:START -->
+- 2026-09-23 — Added 'AI-driven' to Lexicon's avoid list to align with current naming conventions.
 - 2026-08-31 — Updated Lexicon to emphasise 'agents' over 'queues', reflecting the AI trend towards autonomous action.
 - 2026-08-03 — Replaced 'self-aware' with 'responsive' to reflect current AI developments.
 - 2026-07-20 — Streamlined language in the self-awareness section to reflect subtlety and context clarity.
