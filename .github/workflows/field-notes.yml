@@ -72,6 +72,7 @@ jobs:
           node scripts/field-notes/validate.mjs facts.json draft.json src/content/field-notes/
 
       - name: Open an auto-land PR with the new note (if any)
+        id: publish
         env:
           GH_TOKEN: ${{ secrets.AUTOLAND_PAT }}
         run: |
@@ -109,29 +110,32 @@ jobs:
             --base main \
             --head "$branch" \
             --label auto-land
+          # Only reached once the PR exists (bash -e aborts on any failure
+          # above). The close step gates on this output — NOT on `git log`,
+          # which (since the note is committed via the API, #414) reads main's
+          # previous note commit and closed seeds on failed runs (#607).
+          # draft.mjs has already resolved usedSeedIssues deterministically.
+          seeds=$(node -e 'const d=require("./draft.json");const a=Array.isArray(d.usedSeedIssues)?d.usedSeedIssues:[];process.stdout.write(a.filter(n=>Number.isInteger(n)&&n>0).join(" "))')
+          {
+            echo "published=true"
+            echo "seeds=${seeds}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Close the seed issues this note used
-        if: always()
+        # Gate on the publish step's explicit output (#607). No `always()`: if
+        # validate or publish failed, or nothing was published, this is skipped.
+        if: steps.publish.outputs.published == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SEEDS: ${{ steps.publish.outputs.seeds }}
         run: |
-          # Best-effort: only when a note was actually published (the note file
-          # is committed) and the draft reported the seeds it drew on. A missing
-          # draft.json, no usedSeedIssues, or a thin-week no-op simply skips.
-          if [ ! -f draft.json ]; then
-            echo "No draft.json — nothing to close."
-            exit 0
-          fi
-          if [ -z "$(git log -1 --name-only --pretty=format: | grep '^src/content/field-notes/' || true)" ]; then
-            echo "No new note committed this run — leaving seed issues open."
-            exit 0
-          fi
-          issues=$(node -e 'const d=require("./draft.json");const a=Array.isArray(d.usedSeedIssues)?d.usedSeedIssues:[];process.stdout.write(a.filter(n=>Number.isInteger(n)&&n>0).join(" "))')
-          if [ -z "$issues" ]; then
+          # Best-effort: the seeds the published note drew on, as resolved by
+          # the publish step. None reported simply skips.
+          if [ -z "$SEEDS" ]; then
             echo "draft reported no used seed issues — nothing to close."
             exit 0
           fi
-          for n in $issues; do
+          for n in $SEEDS; do
             gh issue close "$n" --comment "Used in this week's field note." || \
               echo "::warning::could not close seed issue #$n (already closed or missing)"
           done
