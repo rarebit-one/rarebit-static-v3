@@ -166,16 +166,24 @@ jobs:
           # A roadmap `status:`/`date:` flip (e.g. "In the works" → "Live now") is
           # a public product claim, not stale copy: the validator can prove the
           # edit is well-formed but not that the claim is true. Hold those for an
-          # owner — `hold` is auto-land's existing opt-out, so nothing merges
-          # until a human removes it. Plain copy edits keep landing unattended.
+          # owner. Two landers can merge this PR, so the hold must stop both:
+          #   * auto-land.yml (label lane) skips `hold` AND drafts;
+          #   * the org maintainer lane (dependabot-auto-merge.yml → rarebit-one/
+          #     .github) merges any green PR opened + pushed by `jaryl`, which
+          #     AUTOLAND_PAT makes this PR, and its ONLY opt-out is draft == false.
+          # So open it as a draft, which stops both; an owner marking it ready is
+          # the approval (the maintainer lane then merges it once green). The
+          # `hold` label stays as a visible marker of why it's a draft. #615
+          # added the label alone and missed the maintainer lane. Plain copy
+          # edits keep landing unattended.
           hold_args=()
           hold_line=""
           if git diff --cached -U0 -- src/data/site.ts | grep -qE '^[-+][[:space:]]*(status|date):'; then
             gh label create hold --color "B60205" --description "Keep auto-land off this PR until a human removes it" --force || true
-            hold_args=(--label hold)
+            hold_args=(--draft --label hold)
             hold_line="
 
-          **Held for an owner:** this changes a roadmap \`status\`/\`date\`, which is a public product claim. Remove the \`hold\` label to let auto-land merge it, or close the PR to keep the current copy."
+          **Held for an owner (draft):** this changes a roadmap \`status\`/\`date\`, which is a public product claim. Marking this PR ready for review is the approval: it then merges once green. To keep the current copy, close it."
           fi
           pr_url="$(gh pr create \
             --title "Site freshness: weekly drift sweep" \
