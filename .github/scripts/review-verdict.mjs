@@ -67,7 +67,10 @@ function blockAndExit(reason, findings) {
       `_Address these and push — the gate re-evaluates on every push. ` +
       `This is an automated correctness/security/invariant gate, not a style review._`,
   );
-  process.exit(0); // job itself succeeded; the *status* is failure
+  // Exit non-zero so the JOB carries the verdict too. auto-land.mjs requires a
+  // SUCCESSFUL pull_request_target run of this workflow for the PR head, which
+  // (unlike a commit status any workflow token can post) PR code cannot forge.
+  process.exit(1);
 }
 
 // --- preconditions (fail closed) -------------------------------------------
@@ -75,13 +78,13 @@ function blockAndExit(reason, findings) {
 if (!OPENAI_API_KEY) {
   setStatus("failure", "OPENAI_API_KEY not set — gate cannot run; nothing auto-lands until wired.");
   console.error("OPENAI_API_KEY absent. Fail closed.");
-  process.exit(0);
+  process.exit(1);
 }
 if (!GH_TOKEN || !OWNER || !REPO || !SHA || !PR) {
   console.error("Missing required env (GH_TOKEN/OWNER/REPO/SHA/PR). Fail closed.");
   // Best-effort status; if SHA is missing this will itself fail and exit 1.
   setStatus("failure", "Gate misconfigured — missing required environment.");
-  process.exit(0);
+  process.exit(1);
 }
 
 let diff = "";
@@ -190,5 +193,5 @@ try {
 } catch (err) {
   console.error(`Gate error: ${err.message}`);
   setStatus("failure", `Gate error (fail closed): ${err.message}`);
-  process.exit(0);
+  process.exit(1);
 }

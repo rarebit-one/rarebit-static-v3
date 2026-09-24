@@ -7,6 +7,8 @@
 //   - NOT label `hold` and NOT label `no-auto-land`
 //   - no `STOP` comment from an OWNER/MEMBER/COLLABORATOR after the latest commit
 //   - mergeable == "MERGEABLE"
+//   - the latest pull_request_target run of review-verdict.yml for the head SHA
+//     succeeded (a commit status alone is forgeable by any workflow token)
 //   - every REQUIRED context is SUCCESS in statusCheckRollup:
 //       "Type-check & build", "Link check", "review/clear"
 //     (advisory "Lighthouse (advisory)" is ignored — an UNSTABLE rollup caused
@@ -93,6 +95,36 @@ function requiredContextsGreen(rollup) {
   return { ok: missing.length === 0, missing };
 }
 
+// --- trusted verdict run ---------------------------------------------------
+
+// `review/clear` is a commit status, and ANY workflow token with statuses:write
+// can post one — including a workflow a same-repo PR adds or edits. So a green
+// status alone is not proof a real review ran. The proof is a SUCCESSFUL
+// `pull_request_target` run of review-verdict.yml for this exact head SHA:
+// GitHub creates those runs from the BASE branch's workflow file (PR code cannot
+// change which workflow runs, or its verdict), and review-verdict.mjs exits
+// non-zero on any verdict but `clear`. For pull_request_target runs, the run's
+// head_sha is the PR head (verified 2026-09-24). Fails closed on any API error.
+const VERDICT_WORKFLOW = ".github/workflows/review-verdict.yml";
+function trustedVerdict(headSha) {
+  try {
+    const data = ghJson([
+      "api",
+      `repos/${REPO_SLUG}/actions/workflows/review-verdict.yml/runs?event=pull_request_target&head_sha=${headSha}&per_page=20`,
+    ]);
+    const runs = (data.workflow_runs || [])
+      .filter((r) => r.path === VERDICT_WORKFLOW && r.head_sha === headSha && r.event === "pull_request_target")
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    const latest = runs[0];
+    if (!latest) return { ok: false, why: "no pull_request_target review-verdict run for this head" };
+    if (latest.status !== "completed") return { ok: false, why: `review-verdict run ${latest.id} is ${latest.status}` };
+    if (latest.conclusion !== "success") return { ok: false, why: `review-verdict run ${latest.id} concluded ${latest.conclusion}` };
+    return { ok: true, why: `review-verdict run ${latest.id} succeeded` };
+  } catch (err) {
+    return { ok: false, why: `could not read review-verdict runs: ${err.message}` };
+  }
+}
+
 // --- STOP comment check ----------------------------------------------------
 
 function hasTrustedStop(pr) {
@@ -163,7 +195,7 @@ try {
     "--limit",
     "50",
     "--json",
-    "number,labels,isDraft,mergeable,mergeStateStatus,statusCheckRollup,headRefName,url",
+    "number,labels,isDraft,mergeable,mergeStateStatus,statusCheckRollup,headRefName,headRefOid,url",
   ]);
 } catch (err) {
   log(`Failed to list PRs: ${err.message}`);
@@ -202,6 +234,12 @@ for (const pr of prs) {
     continue;
   }
 
+  const verdictRun = trustedVerdict(pr.headRefOid);
+  if (!verdictRun.ok) {
+    log(`${tag}: skip — review/clear is not backed by a trusted verdict run (${verdictRun.why}).`);
+    continue;
+  }
+
   if (hasTrustedStop(pr)) {
     log(`${tag}: skip — trusted STOP comment after latest commit.`);
     continue;
@@ -214,7 +252,11 @@ for (const pr of prs) {
   }
 
   try {
-    gh(["pr", "merge", String(pr.number), "--repo", REPO_SLUG, "--squash", "--delete-branch"], {
+    // --match-head-commit pins the merge to the head these checks were read
+    // from: a push landing between the rollup read above and this call makes
+    // GitHub refuse the merge instead of landing an unchecked commit.
+    gh(["pr", "merge", String(pr.number), "--repo", REPO_SLUG, "--squash", "--delete-branch",
+        "--match-head-commit", pr.headRefOid], {
       token: AUTOLAND_MERGE_TOKEN,
     });
     // Comment with the default token (PAT also works; either is fine).
