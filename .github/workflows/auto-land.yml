@@ -78,6 +78,9 @@ permissions:
   pull-requests: write
   statuses: read
   checks: read
+  # auto-land.mjs verifies review/clear against the review-verdict workflow's
+  # own pull_request_target run (a commit status alone is forgeable).
+  actions: read
 
 concurrency:
   group: auto-land
