@@ -51,7 +51,15 @@ jobs:
       SHA: ${{ github.event.pull_request.head.sha }}
       PR: ${{ github.event.pull_request.number }}
     steps:
+      # Check out the BASE commit, not the PR: the next step runs
+      # .github/scripts/review-verdict.mjs with a statuses:write token, so
+      # running the PR's own copy would let a PR rewrite its reviewer and post
+      # its own `review/clear`. The script needs nothing from the PR tree — it
+      # reviews pr.diff, fetched through the API below.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
 
       - name: Mark status pending
         run: |

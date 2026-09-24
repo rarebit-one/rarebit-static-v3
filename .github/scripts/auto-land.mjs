@@ -163,7 +163,7 @@ try {
     "--limit",
     "50",
     "--json",
-    "number,labels,isDraft,mergeable,mergeStateStatus,statusCheckRollup,headRefName,url",
+    "number,labels,isDraft,mergeable,mergeStateStatus,statusCheckRollup,headRefName,headRefOid,url",
   ]);
 } catch (err) {
   log(`Failed to list PRs: ${err.message}`);
@@ -214,7 +214,11 @@ for (const pr of prs) {
   }
 
   try {
-    gh(["pr", "merge", String(pr.number), "--repo", REPO_SLUG, "--squash", "--delete-branch"], {
+    // --match-head-commit pins the merge to the head these checks were read
+    // from: a push landing between the rollup read above and this call makes
+    // GitHub refuse the merge instead of landing an unchecked commit.
+    gh(["pr", "merge", String(pr.number), "--repo", REPO_SLUG, "--squash", "--delete-branch",
+        "--match-head-commit", pr.headRefOid], {
       token: AUTOLAND_MERGE_TOKEN,
     });
     // Comment with the default token (PAT also works; either is fine).
