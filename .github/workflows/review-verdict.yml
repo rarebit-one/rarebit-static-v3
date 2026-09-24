@@ -25,16 +25,8 @@ name: Review verdict
 # always runs. That is only safe because this workflow never executes PR code:
 # it checks out the BASE commit and reads the PR purely as data (pr.diff via the
 # API). Do not add a checkout of the PR head here.
-# TRANSITION: `pull_request` stays for exactly one PR, because `review/clear` is a
-# required context and main's copy of this file only listens to
-# `pull_request` — without it, the PR introducing pull_request_target could
-# never get a verdict. auto-land.mjs already refuses a verdict that is not
-# backed by the pull_request_target run, so the forgeable path buys nothing.
-# Drop `pull_request:` in the follow-up PR.
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened]
-  pull_request:
     types: [opened, synchronize, reopened]
 
 permissions:
@@ -43,7 +35,9 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: review-verdict-${{ github.event.pull_request.number }}
+  # Keyed by event as well, so a re-added second trigger can never cancel the
+  # trusted pull_request_target run (auto-land only accepts that one).
+  group: review-verdict-${{ github.event.pull_request.number }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
