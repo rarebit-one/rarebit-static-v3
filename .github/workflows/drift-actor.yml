@@ -34,10 +34,7 @@ on:
     - cron: "0 22 * * 6"
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+permissions: {}  # granted per job below (least privilege)
 
 concurrency:
   group: drift-actor
@@ -45,6 +42,10 @@ concurrency:
 
 jobs:
   act:
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:

@@ -74,14 +74,7 @@ on:
     - cron: "23 */6 * * *"
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pull-requests: write
-  statuses: read
-  checks: read
-  # auto-land.mjs verifies review/clear against the review-verdict workflow's
-  # own pull_request_target run (a commit status alone is forgeable).
-  actions: read
+permissions: {}  # granted per job below (least privilege)
 
 concurrency:
   group: auto-land
@@ -89,6 +82,14 @@ concurrency:
 
 jobs:
   sweep:
+    permissions:
+      contents: read
+      pull-requests: write
+      statuses: read
+      checks: read
+      # auto-land.mjs verifies review/clear against the review-verdict workflow's
+      # own pull_request_target run (a commit status alone is forgeable).
+      actions: read
     name: Sweep eligible PRs
     runs-on: ubuntu-latest
     timeout-minutes: 10

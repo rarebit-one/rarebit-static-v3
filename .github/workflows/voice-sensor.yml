@@ -24,9 +24,7 @@ on:
     - cron: "0 20 * * 0"
   workflow_dispatch:
 
-permissions:
-  contents: read
-  issues: write
+permissions: {}  # granted per job below (least privilege)
 
 concurrency:
   group: voice-sensor
@@ -34,6 +32,9 @@ concurrency:
 
 jobs:
   sense:
+    permissions:
+      contents: read
+      issues: write
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:

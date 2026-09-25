@@ -27,9 +27,7 @@ on:
     - cron: "0 22 * * 0"
   workflow_dispatch:
 
-permissions:
-  contents: write
-  issues: write
+permissions: {}  # granted per job below (least privilege)
 
 concurrency:
   group: field-notes
@@ -37,6 +35,9 @@ concurrency:
 
 jobs:
   publish:
+    permissions:
+      contents: write
+      issues: write
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
