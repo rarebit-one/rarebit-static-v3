@@ -33,10 +33,7 @@ on:
     - cron: "0 21 * * 0"
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+permissions: {}  # granted per job below (least privilege)
 
 concurrency:
   group: voice-actor
@@ -44,6 +41,10 @@ concurrency:
 
 jobs:
   act:
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:

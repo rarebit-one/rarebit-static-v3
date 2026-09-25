@@ -22,9 +22,7 @@ on:
     - cron: "0 21 * * 6"
   workflow_dispatch:
 
-permissions:
-  contents: read
-  issues: write
+permissions: {}  # granted per job below (least privilege)
 
 concurrency:
   group: drift-sensor
@@ -32,6 +30,9 @@ concurrency:
 
 jobs:
   sense:
+    permissions:
+      contents: read
+      issues: write
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:

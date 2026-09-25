@@ -15,16 +15,7 @@ on:
     types: [completed]
     branches: [main]
 
-permissions:
-  contents: read
-  actions: read
-  # deployments: write must be granted here so the reusable tracker — which
-  # declares an `environment:` — can be granted it in turn (a called workflow's
-  # token is capped by the caller's permissions). Likewise pull-requests: write,
-  # which the tracker needs for its merged-PR status comment — omitting it here
-  # makes the reusable-workflow call fail at startup.
-  deployments: write
-  pull-requests: write
+permissions: {}  # granted per job below (least privilege)
 
 concurrency:
   group: deploy-production
@@ -35,6 +26,7 @@ jobs:
   # triggering CI run succeeded (same gate as check-tracking). The outcome reply
   # is posted by narrate-outcome once tracking finishes. Fail-soft throughout.
   narrate-start:
+    permissions: {}  # no GitHub token or API use in this job
     name: Slack — narrate start
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
@@ -53,6 +45,7 @@ jobs:
           text: "🧪 *Production deploy started* — `${{ github.repository }}`\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|run log>"
 
   check-tracking:
+    permissions: {}  # no GitHub token or API use in this job
     name: Check DO tracking config
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
@@ -74,6 +67,16 @@ jobs:
           fi
 
   track-deployment:
+    permissions:
+      contents: read
+      actions: read
+      # deployments: write must be granted here so the reusable tracker — which
+      # declares an `environment:` — can be granted it in turn (a called workflow's
+      # token is capped by the caller's permissions). Likewise pull-requests: write,
+      # which the tracker needs for its merged-PR status comment — omitting it here
+      # makes the reusable-workflow call fail at startup.
+      deployments: write
+      pull-requests: write
     name: Production
     needs: check-tracking
     if: ${{ needs.check-tracking.outputs.has_app_id == 'true' }}
@@ -102,6 +105,7 @@ jobs:
   # Post the outcome reply into the deploy thread. Runs always (so a failed or
   # skipped tracker still narrates), but only when the thread root was opened.
   narrate-outcome:
+    permissions: {}  # no GitHub token or API use in this job
     name: Slack — narrate outcome
     needs: [narrate-start, check-tracking, track-deployment]
     if: ${{ always() && needs.narrate-start.result == 'success' }}

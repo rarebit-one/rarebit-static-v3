@@ -27,9 +27,7 @@ on:
     - cron: "30 17 * * *"
   workflow_dispatch:
 
-permissions:
-  contents: read
-  issues: write
+permissions: {}  # granted per job below (least privilege)
 
 concurrency:
   group: notebook
@@ -37,6 +35,9 @@ concurrency:
 
 jobs:
   scout:
+    permissions:
+      contents: read
+      issues: write
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
