@@ -16,7 +16,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { scrubCrossOrg } from "./gather.mjs";
+import { scrubCrossOrg, scrubPrivateNames } from "./gather.mjs";
 
 const PLACEHOLDER = "a sibling project";
 
@@ -64,4 +64,38 @@ test("returns non-strings and empty strings unchanged", () => {
   assert.equal(scrubCrossOrg(undefined), undefined);
   assert.equal(scrubCrossOrg(null), null);
   assert.equal(scrubCrossOrg(42), 42);
+});
+
+// --- scrubPrivateNames (#595) ----------------------------------------------
+// A public PR titled "re-vendor estate hooks from agent-estate" reached the
+// drafter verbatim; the note repeated the private repo name and the validator
+// rejected the week. The scrub must remove private names from public text,
+// using the validator's identifier boundary so public look-alikes survive.
+
+test("scrubs a private repo name out of a public PR title", () => {
+  const out = scrubPrivateNames("chore: re-vendor estate hooks from agent-estate f05dc88", [
+    "agent-estate",
+    "rarebit-one/agent-estate",
+  ]);
+  assert.equal(out, "chore: re-vendor estate hooks from a private repository f05dc88");
+});
+
+test("prefers the full_name and is case-insensitive", () => {
+  const out = scrubPrivateNames("Sync from Rarebit-One/Agent-Estate", ["agent-estate", "rarebit-one/agent-estate"]);
+  assert.equal(out, "Sync from a private repository");
+});
+
+test("never fires inside a longer public identifier (validator boundary)", () => {
+  const input = "rarebit-static-v3: tidy https://github.com/rarebit-one/rarebit-static-v3/pull/1";
+  assert.equal(scrubPrivateNames(input, ["rarebit-static"]), input);
+});
+
+test("ignores terms shorter than 3 chars and uses a custom placeholder", () => {
+  assert.equal(scrubPrivateNames("merged by jaryl via ci", ["ci", "jaryl"], "a maintainer"), "merged by a maintainer via ci");
+});
+
+test("non-string / empty inputs pass through", () => {
+  assert.equal(scrubPrivateNames("", ["x-y-z"]), "");
+  assert.equal(scrubPrivateNames(undefined, ["x-y-z"]), undefined);
+  assert.equal(scrubPrivateNames("keep", undefined), "keep");
 });
