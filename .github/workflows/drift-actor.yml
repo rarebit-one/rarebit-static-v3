@@ -22,7 +22,8 @@ name: Drift actor
 #
 # Sat 22:00 UTC — after the sensor (Sat 21:00).
 #
-# Missing any secret → the relevant step no-ops (exit 0) and no PR is opened, so
+# Missing any secret → the credential preflight flags it LOUDLY (::warning:: +
+# an UNVERIFIED step-summary line, #355), then the relevant step no-ops (exit 0) and no PR is opened, so
 # the workflow stays green until all are wired up:
 #   FEED_GITHUB_PAT (optional — local reads work without it) · OPENAI_API_KEY
 #   (draft) · AUTOLAND_PAT (open the PR as a bot that can trigger downstream checks)
@@ -64,6 +65,17 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
+
+      # Loud no-op (#355): a missing credential still degrades to exit 0, but it
+      # now says so — a ::warning:: annotation plus an UNVERIFIED line in the run
+      # summary — so a green run can't be mistaken for one that published.
+      - name: Credential preflight (loud no-op if a secret is missing)
+        env:
+          AUTOLAND_PAT: ${{ secrets.AUTOLAND_PAT }}
+        run: >-
+          node scripts/lib/credential-preflight.mjs
+          "OPENAI_API_KEY|the Draft step is skipped, so no drift patch is proposed"
+          "AUTOLAND_PAT|the PR-open step is skipped, so no drift PR is opened"
 
       - name: Slack — narrate start (thread root)
         id: slack

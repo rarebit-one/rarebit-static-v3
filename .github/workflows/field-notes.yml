@@ -18,7 +18,8 @@ name: Field notes
 # review-verdict.yml run on it; the auto-land sweeper merges it once green. Using
 # AUTOLAND_PAT (a real-user token) for the push is what triggers those workflows.
 #
-# Missing any secret → the relevant step no-ops (exit 0) and nothing is
+# Missing any secret → the credential preflight flags it LOUDLY (::warning:: +
+# an UNVERIFIED step-summary line, #355), then the relevant step no-ops (exit 0) and nothing is
 # published, so the workflow stays green until they are wired up:
 #   FEED_GITHUB_PAT · OPENAI_API_KEY · AUTOLAND_PAT
 
@@ -57,6 +58,16 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
+
+      # Loud no-op (#355): a missing credential still degrades to exit 0, but it
+      # now says so — a ::warning:: annotation plus an UNVERIFIED line in the run
+      # summary — so a green run can't be mistaken for one that published.
+      - name: Credential preflight (loud no-op if a secret is missing)
+        run: >-
+          node scripts/lib/credential-preflight.mjs
+          "FEED_GITHUB_PAT|Gather falls back to GITHUB_TOKEN, which cannot see private repos (no private aggregate, empty private blocklist)|degraded"
+          "OPENAI_API_KEY|the Draft step is skipped, so no field note is written"
+          "AUTOLAND_PAT|the publish step is skipped, so no field-note PR is opened"
 
       - name: Gather (public detail + anonymized private aggregate)
         run: node scripts/field-notes/gather.mjs facts.json

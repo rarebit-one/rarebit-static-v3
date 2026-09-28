@@ -22,7 +22,8 @@ name: Voice actor
 #
 # Sun 21:00 UTC — after the sensor (Sun 20:00) and before field-notes (Sun 22:00).
 #
-# Missing any secret → the relevant step no-ops (exit 0) and nothing is opened, so
+# Missing any secret → the credential preflight flags it LOUDLY (::warning:: +
+# an UNVERIFIED step-summary line, #355), then the relevant step no-ops (exit 0) and nothing is opened, so
 # the workflow stays green until both are wired up:
 #   OPENAI_API_KEY (draft) · AUTOLAND_PAT (checkout token + gh pr create)
 # The `voice-proposal` + `in-progress` labels are created at runtime
@@ -61,6 +62,17 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
+
+      # Loud no-op (#355): a missing credential still degrades to exit 0, but it
+      # now says so — a ::warning:: annotation plus an UNVERIFIED line in the run
+      # summary — so a green run can't be mistaken for one that published.
+      - name: Credential preflight (loud no-op if a secret is missing)
+        env:
+          AUTOLAND_PAT: ${{ secrets.AUTOLAND_PAT }}
+        run: >-
+          node scripts/lib/credential-preflight.mjs
+          "OPENAI_API_KEY|the Draft step is skipped, so no voice change is proposed"
+          "AUTOLAND_PAT|the PR-open step is skipped, so no voice PR is opened"
 
       - name: Slack — narrate start (thread root)
         id: slack
