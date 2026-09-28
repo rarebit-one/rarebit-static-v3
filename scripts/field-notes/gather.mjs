@@ -102,6 +102,39 @@ export function scrubCrossOrg(text) {
   }
   return out;
 }
+// --- Private-name scrub (deterministic, #595) ------------------------------
+// A PUBLIC rarebit-one PR can legitimately name a PRIVATE repo in its title —
+// e.g. the estate-wide "chore: re-vendor estate hooks from agent-estate <sha>"
+// PRs merged into every public gem. The title reached the drafter verbatim,
+// gpt-4o repeated it, and validate.mjs (correctly) REJECTED the whole week on
+// the blocklisted identifier (run 36353820510). Same philosophy as
+// scrubCrossOrg: the LLM phrases, it does not redact — so strip private names
+// from PUBLIC text BEFORE the prompt, and keep the validator as the backstop.
+//
+// Matches whole identifiers only, with the SAME boundary the validator uses
+// ([A-Za-z0-9_-] continue an identifier), so the private "rarebit-static" never
+// fires inside the public "rarebit-static-v3". Terms shorter than 3 chars are
+// ignored, as in the validator. `names` is the private blocklist (repo names,
+// full names, member logins); longest first so a full_name wins over its repo.
+// Callers pass repo names and logins separately so each gets a fitting
+// placeholder ("a private repository" / "a maintainer").
+const PRIVATE_PLACEHOLDER = "a private repository";
+export function scrubPrivateNames(text, names, placeholder = PRIVATE_PLACEHOLDER) {
+  if (typeof text !== "string" || text === "" || !Array.isArray(names)) return text;
+  const terms = [...new Set(names.map((n) => String(n).trim()).filter((n) => n.length >= 3))].sort(
+    (a, b) => b.length - a.length
+  );
+  let out = text;
+  for (const term of terms) {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out = out.replace(
+      new RegExp(`(^|[^A-Za-z0-9_-])${escaped}(?![A-Za-z0-9_-])`, "gi"),
+      (_m, pre) => `${pre}${placeholder}`
+    );
+  }
+  return out;
+}
+
 const OUT = process.argv[2] ?? "facts.json";
 const TZ_OFFSET = "+08:00"; // SGT — the farm runs on Singapore time
 const SEED_LABEL = "field-note-seed";
@@ -352,6 +385,23 @@ async function main() {
   // for the drafter, NOT facts to assert; the validator still gates URLs. The
   // issue number lets the workflow close seeds the draft actually used.
   const notebookSeeds = await fetchNotebookSeeds();
+
+  // Strip private repo names + member logins from every PUBLIC human-readable
+  // field before it can reach the drafter (#595). URLs are left untouched —
+  // they point at public repos and the validator gates them separately.
+  const privateRepoNames = [
+    ...privateRepos.map((r) => r.full_name),
+    ...privateRepos.map((r) => r.name),
+  ];
+  const memberLogins = Array.isArray(members) ? members.map((m) => m.login) : [];
+  const scrubPrivate = (t) =>
+    scrubPrivateNames(scrubPrivateNames(t, privateRepoNames), memberLogins, "a maintainer");
+  for (const pr of prs) pr.title = scrubPrivate(pr.title);
+  for (const rel of releases) {
+    rel.name = scrubPrivate(rel.name);
+    rel.tag = scrubPrivate(rel.tag);
+  }
+  for (const seed of notebookSeeds ?? []) seed.angle = scrubPrivate(seed.angle);
 
   const facts = {
     window: { from, to },
