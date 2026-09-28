@@ -16,7 +16,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { scrubCrossOrg, scrubPrivateNames } from "./gather.mjs";
+import { scrubCrossOrg, scrubPrivateNames, slugNamesPrivate } from "./gather.mjs";
 
 const PLACEHOLDER = "a sibling project";
 
@@ -98,4 +98,28 @@ test("non-string / empty inputs pass through", () => {
   assert.equal(scrubPrivateNames("", ["x-y-z"]), "");
   assert.equal(scrubPrivateNames(undefined, ["x-y-z"]), undefined);
   assert.equal(scrubPrivateNames("keep", undefined), "keep");
+});
+
+// --- slugNamesPrivate (#595 follow-up) --------------------------------------
+test("detects a private name embedded mid-slug as hyphen segments", () => {
+  assert.equal(slugNamesPrivate("updates-in-heyarr-mobile-and-dependency-management", ["heyarr-mobile"]), true);
+  assert.equal(slugNamesPrivate("heyarr-mobile", ["heyarr-mobile"]), true);
+  assert.equal(slugNamesPrivate("Shipping-Heyarr-Mobile-hooks", ["heyarr-mobile"]), true);
+});
+
+test("does not fire on a longer public name or a partial segment", () => {
+  assert.equal(
+    slugNamesPrivate("refinements-in-rarebit-static-v3-and-standard-id-releases", ["rarebit-static"], ["rarebit-static-v3", "standard_id"]),
+    false
+  );
+  // …but the same private name standing alone in a slug is still caught.
+  assert.equal(slugNamesPrivate("notes-on-rarebit-static-and-rarebit-static-v3", ["rarebit-static"], ["rarebit-static-v3"]), true);
+  assert.equal(slugNamesPrivate("heyarr-mobile-app-notes", ["mobile-ap"]), false);
+  assert.equal(slugNamesPrivate("any-slug", ["rarebit-one/any-slug", "an"]), false);
+  assert.equal(slugNamesPrivate("", ["x-y-z"]), false);
+});
+
+test("normalizes _ and . in repo names to the slug's hyphens", () => {
+  assert.equal(slugNamesPrivate("updates-from-agent-estate", ["agent_estate"]), true);
+  assert.equal(slugNamesPrivate("standard-id-v0-27-0-release", ["standard_id"], ["standard_id"]), false);
 });
