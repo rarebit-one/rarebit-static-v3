@@ -135,6 +135,30 @@ export function scrubPrivateNames(text, names, placeholder = PRIVATE_PLACEHOLDER
   return out;
 }
 
+// Slug-aware check (#595): does a kebab-case slug contain a private name as a
+// contiguous run of hyphen-delimited segments? scrubPrivateNames can't answer
+// this — it treats "-" as an identifier character (right for prose, so
+// "rarebit-static" never fires inside "rarebit-static-v3"), which means a name
+// embedded mid-slug ("updates-in-heyarr-mobile-and-…") is never matched.
+// Segments alone can't tell "rarebit-static" from the start of
+// "rarebit-static-v3", so PUBLIC repo names are cut out of the slug first
+// (longest first); whatever private name still appears is a real one.
+export function slugNamesPrivate(slug, names, publicNames = []) {
+  if (typeof slug !== "string" || slug === "" || !Array.isArray(names)) return false;
+  // Slugs are kebab-case, so a repo's "_" / "." separators appear as "-".
+  const kebab = (n) => String(n).trim().toLowerCase().replace(/[_.]+/g, "-");
+  let hay = `-${kebab(slug)}-`;
+  const pub = [...publicNames]
+    .map(kebab)
+    .filter((n) => n.length >= 3)
+    .sort((a, b) => b.length - a.length);
+  for (const p of pub) hay = hay.split(`-${p}-`).join("-~-");
+  return names.some((n) => {
+    const t = kebab(n);
+    return t.length >= 3 && !t.includes("/") && hay.includes(`-${t}-`);
+  });
+}
+
 const OUT = process.argv[2] ?? "facts.json";
 const TZ_OFFSET = "+08:00"; // SGT — the farm runs on Singapore time
 const SEED_LABEL = "field-note-seed";
@@ -403,13 +427,17 @@ async function main() {
   }
   for (const seed of notebookSeeds ?? []) seed.angle = scrubPrivate(seed.angle);
   // Past-note metadata reaches the prompt too, and a repo named in an old note
-  // can have gone private since — scrub its human-readable fields (the slug is
-  // a link target and stays as-is; the validator gates dead links separately).
-  const pastNotes = readPastNotes().map((n) => ({
-    ...n,
-    title: scrubPrivate(n.title),
-    description: scrubPrivate(n.description),
-  }));
+  // can have gone private since — scrub its human-readable fields. The slug is
+  // a link target and can't be rewritten without breaking the link, so a note
+  // whose SLUG names a now-private identifier is dropped from pastNotes
+  // entirely (the drafter just can't back-link it).
+  const pastNotes = readPastNotes()
+    .filter((n) => !slugNamesPrivate(n.slug, [...privateRepoNames, ...memberLogins], [...publicNames]))
+    .map((n) => ({
+      ...n,
+      title: scrubPrivate(n.title),
+      description: scrubPrivate(n.description),
+    }));
 
   const facts = {
     window: { from, to },
