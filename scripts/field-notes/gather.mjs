@@ -402,6 +402,14 @@ async function main() {
     rel.tag = scrubPrivate(rel.tag);
   }
   for (const seed of notebookSeeds ?? []) seed.angle = scrubPrivate(seed.angle);
+  // Past-note metadata reaches the prompt too, and a repo named in an old note
+  // can have gone private since — scrub its human-readable fields (the slug is
+  // a link target and stays as-is; the validator gates dead links separately).
+  const pastNotes = readPastNotes().map((n) => ({
+    ...n,
+    title: scrubPrivate(n.title),
+    description: scrubPrivate(n.description),
+  }));
 
   const facts = {
     window: { from, to },
@@ -416,7 +424,7 @@ async function main() {
       events,
       blocklist,
     },
-    pastNotes: readPastNotes(),
+    pastNotes,
     ...(notebookSeeds && notebookSeeds.length ? { notebook: notebookSeeds } : {}),
   };
 
