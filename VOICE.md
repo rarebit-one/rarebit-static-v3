@@ -42,7 +42,7 @@ Hard rules, always:
 
 ## Lexicon
 
-**Reach for:** the farm; agents; receipts; runs; monitors CI pipelines; humans in the loop; the build log; small teams, impossible things; human creativity, amplified.
+**Reach for:** the farm; agents; receipts; runs; monitors CI pipelines; humans in the loop; the build log; small teams, impossible things; human creativity, amplified; agentic AI.
 
 **Avoid:** synergy; leverage (as a verb); unlock; supercharge; effortless; magic; next-generation; disrupt; solution (as filler). Anything a generic SaaS landing page would say.
 
@@ -58,6 +58,7 @@ Hard rules, always:
 The voice-evolution workflow appends dated, bounded entries here. Newest first.
 
 <!-- VOICE-CHANGELOG:START -->
+- 2026-10-19 — Added 'agentic AI' to the Lexicon to reflect current AI discussions and align with trends.
 - 2026-10-12 — Removed 'AI-driven' from the Lexicon's avoid list to reflect its frequent usage in current AI contexts.
 - 2026-09-28 — Adjusted phrasing in the Voice header to reflect collaboration as a core human activity on the farm.
 - 2026-09-23 — Added 'AI-driven' to Lexicon's avoid list to align with current naming conventions.
