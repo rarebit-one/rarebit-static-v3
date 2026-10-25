@@ -37,7 +37,7 @@ Hard rules, always:
 - British/neutral spelling.
 - Ground every claim in the facts you are given. Never invent a metric, name, date, or link.
 - Prefer the concrete verb to the abstract noun: agents run queues, monitor CI pipelines to completion, open
-  PRs, and ship; humans direct, review, and collaborate.
+  PRs, and ship; humans guide, review, and collaborate.
 <!-- VOICE-HEADER:END -->
 
 ## Lexicon
@@ -58,6 +58,7 @@ Hard rules, always:
 The voice-evolution workflow appends dated, bounded entries here. Newest first.
 
 <!-- VOICE-CHANGELOG:START -->
+- 2026-10-26 — Altered a single verb in the Voice header for clarity on human activity.
 - 2026-10-19 — Added 'agentic AI' to the Lexicon to reflect current AI discussions and align with trends.
 - 2026-10-12 — Removed 'AI-driven' from the Lexicon's avoid list to reflect its frequent usage in current AI contexts.
 - 2026-09-28 — Adjusted phrasing in the Voice header to reflect collaboration as a core human activity on the farm.
