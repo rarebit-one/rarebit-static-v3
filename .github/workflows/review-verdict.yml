@@ -2,22 +2,21 @@ name: Review verdict
 
 # Binding, repo-local review gate for gated auto-land (issue #29).
 #
-# The existing Claude Code Review workflow (claude-code-review.yml) only POSTS
-# human-readable comments and lives in the rarebit-one/.github org repo, so it
-# cannot be a reliable, controllable merge gate. THIS workflow is self-contained
-# and fully owned here: it sends the PR diff to the OpenAI API (via the shared
-# scripts/lib/llm.mjs helper) with a strict rubric and records the verdict as a
-# commit status named `review/clear` on the PR head SHA. That status is one of
-# the required contexts for branch protection (see scripts/autoland/enable.sh)
-# and is consumed by auto-land.yml.
+# This workflow is self-contained and fully owned here: it sends the PR diff
+# to the OpenAI API (via the shared scripts/lib/llm.mjs helper) with a strict
+# rubric and records the verdict as a commit status named `review/clear` on
+# the PR head SHA. That status is one of the required contexts for branch
+# protection (see scripts/autoland/enable.sh) and is consumed by auto-land.yml.
+#
+# Codex (chatgpt-codex-connector[bot]) also reviews PRs in this repo, but its
+# review is informational. THIS workflow's `review/clear` status is the binding
+# required check — the org auto-lander is configured with
+# `maintainer-review-check: 'review/clear'` to match.
 #
 # Fail CLOSED: any error (missing key, API failure, unparseable response) sets
 # the status to `failure`, never `success`. The gate must never green on a
 # broken gate. Re-runs on every push (synchronize), so the loop
 # "address findings → push → re-evaluate → clears" works naturally.
-#
-# claude-code-review.yml is intentionally left UNTOUCHED — it stays as
-# informal commentary; this is the binding signal.
 
 # pull_request_target, NOT pull_request: on `pull_request` GitHub runs the
 # WORKFLOW FILE from the PR itself, so a same-repo PR could edit this file to

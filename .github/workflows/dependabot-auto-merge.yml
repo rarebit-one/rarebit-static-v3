@@ -42,5 +42,12 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    with:
+      # The binding review gate in this repo is `review/clear` (produced by
+      # review-verdict.yml, OpenAI-powered), not the org-default Codex
+      # comment gate. Pass it explicitly so the lander waits for the right
+      # signal. (The default '' would poll Codex's codex-review-state
+      # comment, which is informational here, not the required check.)
+      maintainer-review-check: 'review/clear'
     uses: rarebit-one/.github/.github/workflows/dependabot-auto-merge.yml@main
     secrets: inherit

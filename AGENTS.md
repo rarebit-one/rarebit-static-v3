@@ -98,8 +98,8 @@ it. Full description: [`docs/agents/auto-land.md`](docs/agents/auto-land.md). Tr
   is the binding review gate: an **OpenAI** call (`scripts/lib/llm.mjs`) with a strict rubric.
   **Fail closed:** any
   error (missing `OPENAI_API_KEY`, API failure, unparseable response) sets `failure`, never
-  `success`. The org-level `.github/workflows/claude-code-review.yml` is informal commentary —
-  NOT the gate.
+  `success`. Codex (`chatgpt-codex-connector[bot]`) also reviews PRs here, but its review is
+  informational — NOT the gate.
 - **`.github/workflows/auto-land.yml`** merges PRs labelled `auto-land` once `Type-check & build`,
   `Link check` and `review/clear` are green (Lighthouse is advisory). **DRY-RUN unless repo var
   `AUTOLAND_LIVE == "true"`.**
