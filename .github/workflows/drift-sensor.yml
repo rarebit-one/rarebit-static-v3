@@ -48,7 +48,7 @@ jobs:
       - name: Slack — narrate start (thread root)
         id: slack
         continue-on-error: true
-        uses: rarebit-one/.github/.github/actions/slack-deploy-thread@main
+        uses: rarebit-one/.github/.github/actions/slack-deploy-thread@v3  # moving major tag, auto-advanced on .github main (sre-brain#831)
         with:
           bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
           channel: ${{ vars.SLACK_STATIC_V3_CHANNEL_ID }}
@@ -64,7 +64,7 @@ jobs:
       - name: Slack — narrate outcome (thread reply)
         if: always()
         continue-on-error: true
-        uses: rarebit-one/.github/.github/actions/slack-deploy-thread@main
+        uses: rarebit-one/.github/.github/actions/slack-deploy-thread@v3  # moving major tag, auto-advanced on .github main (sre-brain#831)
         with:
           bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
           channel: ${{ vars.SLACK_STATIC_V3_CHANNEL_ID }}
