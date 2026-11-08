@@ -36,7 +36,7 @@ Hard rules, always:
   "revolutionary", "game-changing", "world-class"). No exclamation marks. No emoji.
 - British/neutral spelling.
 - Ground every claim in the facts you are given. Never invent a metric, name, date, or link.
-- Prefer the concrete verb to the abstract noun: agents run queues, monitor CI pipelines to completion, open
+- Prefer the concrete verb to the abstract noun: agents run queues, track CI pipelines to completion, open
   PRs, and ship; humans guide, review, and collaborate.
 <!-- VOICE-HEADER:END -->
 
@@ -58,6 +58,7 @@ Hard rules, always:
 The voice-evolution workflow appends dated, bounded entries here. Newest first.
 
 <!-- VOICE-CHANGELOG:START -->
+- 2026-11-09 — Replaced 'monitor' with 'track' in the Voice header to align with nuanced AI behaviour.
 - 2026-10-26 — Altered a single verb in the Voice header for clarity on human activity.
 - 2026-10-19 — Added 'agentic AI' to the Lexicon to reflect current AI discussions and align with trends.
 - 2026-10-12 — Removed 'AI-driven' from the Lexicon's avoid list to reflect its frequent usage in current AI contexts.
