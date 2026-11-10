@@ -27,6 +27,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { emitIssue, ensureLabel, listOpenIssues } from "../lib/issues.mjs";
+import { sgtDate } from "../lib/sgt-date.mjs";
 
 const SIGNAL_PATH = process.argv[2] ?? "signal.json";
 const LABEL = "voice-proposal";
@@ -65,7 +66,7 @@ if (open.length > 0) {
 const carried = sources.map((s) => ({ url: s.url, host: s.host, text: s.text }));
 const hosts = [...new Set(carried.map((s) => s.host))].filter(Boolean);
 
-const today = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10); // SGT
+const today = sgtDate();
 const title = `Voice proposal — weekly bounded VOICE.md nudge (${today})`;
 const body = [
   "A weekly bounded evolution of `VOICE.md` is warranted from this week's public frontier-lab signal.",

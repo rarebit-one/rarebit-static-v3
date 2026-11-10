@@ -22,6 +22,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { voiceHeader } from "../lib/voice.mjs";
 import { callLLM, hasOpenAIKey } from "../lib/llm.mjs";
+import { sgtDate } from "../lib/sgt-date.mjs";
 
 const VOICE_PATH = process.argv[2] ?? "VOICE.md";
 const SIGNAL_PATH = process.argv[3] ?? "signal.json";
@@ -92,7 +93,7 @@ if (!Array.isArray(signal.sources) || signal.sources.length === 0) {
 }
 
 const currentVoice = readFileSync(VOICE_PATH, "utf8");
-const today = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10); // SGT calendar day
+const today = sgtDate(); // SGT calendar day — must match validate.mjs and review-verdict (#866)
 
 const system = `${voiceHeader()}
 

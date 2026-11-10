@@ -17,14 +17,15 @@ import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from "no
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { sgtDate } from "../lib/sgt-date.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const VALIDATE = join(here, "validate.mjs");
 const VOICE = join(here, "fixtures", "VOICE.md");
 const CURRENT = readFileSync(VOICE, "utf8");
 
-// Today's date in SGT — must match how validate.mjs derives it.
-const TODAY = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
+// Today's date in SGT — the same helper validate.mjs uses.
+const TODAY = sgtDate();
 
 const C_START = "<!-- VOICE-CHANGELOG:START -->";
 const H_START = "<!-- VOICE-HEADER:START -->";

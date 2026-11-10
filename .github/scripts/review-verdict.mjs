@@ -12,6 +12,7 @@
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { callLLM } from "../../scripts/lib/llm.mjs";
+import { sgtDate } from "../../scripts/lib/sgt-date.mjs";
 
 const { GH_TOKEN, OPENAI_API_KEY, OWNER, REPO, SHA, PR } = process.env;
 const CONTEXT = "review/clear";
@@ -115,15 +116,21 @@ if (diff.length > MAX_DIFF) {
 // Today's date, so the model can judge dates in the diff (e.g. a field note's
 // `pubDate`) against reality instead of its training cutoff — without this it
 // flagged an already-past pubDate as "a future date".
-const TODAY = new Date().toISOString().slice(0, 10);
+//
+// SGT, not UTC: the pipelines date what they write on the farm's SGT calendar
+// day (scripts/lib/sgt-date.mjs). With a UTC "today", any PR opened after
+// 16:00 UTC carried tomorrow's date and was blocked as future-dated (#866). The
+// SGT day is never behind the UTC day, so UTC-dated content still reads as past.
+const TODAY = sgtDate();
 
 const RUBRIC = `You are a strict but fair pre-merge gate for the rarebit.one static marketing
 site (Astro + Tailwind 4, zero JS frameworks). You return a binding verdict that
 decides whether a pull request may auto-merge with NO human in the loop.
 
-TODAY'S DATE IS ${TODAY} (UTC). Use it — not your training cutoff — for any
-judgement about dates in the diff. A date on or before ${TODAY} is in the PAST;
-never call it future-dated.
+TODAY'S DATE IS ${TODAY} (Singapore time, UTC+8 — the farm's calendar day; the
+UTC date may still be the day before). Use it — not your training cutoff — for any
+judgement about dates in the diff. A date on or before ${TODAY} is in the PAST or
+today; never call it future-dated.
 
 Return ONLY a JSON object, no prose, no markdown fences:
 { "verdict": "clear" | "blocking", "findings": ["..."] }

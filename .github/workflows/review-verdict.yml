@@ -31,7 +31,11 @@ on:
 permissions:
   statuses: write
   contents: read
-  pull-requests: read
+  # write, not read: blockAndExit() posts the findings with `gh pr comment`
+  # (GraphQL addComment), which failed with "Resource not accessible by
+  # integration" under read, so blocked PRs never showed why (#866). Safe under
+  # pull_request_target only because this job never checks out or runs PR code.
+  pull-requests: write
 
 concurrency:
   # Keyed by event as well, so a re-added second trigger can never cancel the
