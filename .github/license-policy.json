@@ -1,0 +1,7 @@
+{
+  "exceptions": [
+    {"ecosystem": "npm", "name": "@img/sharp-libvips-*", "reason": "Build-time image optimisation for the static build; libvips is not shipped to visitors (licence audit 2026-11-10)."},
+    {"ecosystem": "npm", "name": "@img/sharp-win32-*", "reason": "Build-time image optimisation (Windows builds of sharp, LGPL libvips inside); never shipped (licence audit 2026-11-10)."},
+    {"ecosystem": "npm", "name": "@img/sharp-wasm32", "reason": "Build-time image optimisation (WASM build of sharp, LGPL libvips inside); never shipped (licence audit 2026-11-10)."}
+  ]
+}
