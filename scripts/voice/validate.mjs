@@ -33,6 +33,7 @@
 // Output:  argv[4] new VOICE.md path       (default = the current VOICE.md path)
 
 import { readFileSync, writeFileSync } from "node:fs";
+import { sgtDate } from "../lib/sgt-date.mjs";
 
 const VOICE_PATH = process.argv[2] ?? "VOICE.md";
 const PROPOSAL_PATH = process.argv[3] ?? "proposal.json";
@@ -202,7 +203,7 @@ if (proposedChangelog.trim() !== currentChangelog.trim()) {
 }
 
 // The new entry must start with today's date (SGT) in YYYY-MM-DD form.
-const today = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
+const today = sgtDate();
 const entry = proposal.changelog.trim().replace(/^[-*]\s*/, ""); // tolerate a leading bullet
 if (!entry.startsWith(today)) {
   fail(`changelog entry must start with today's date ${today}; got "${entry.slice(0, 32)}…"`);
