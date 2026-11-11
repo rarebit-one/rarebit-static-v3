@@ -15,5 +15,6 @@ Moved verbatim from the old `CLAUDE.md` ("Conventions"); the rules that must hol
   keep them in sync. NB: app-spec changes (`.do/app.yaml` — ingress, envs) don't apply on
   push, and **never apply that file raw**: `doctl apps update --spec` is a full-spec replace
   and the committed file deliberately omits the GITHUB_TOKEN secret — applying it verbatim
-  wipes the token and breaks all subsequent deploys. Merge changes into the live spec
-  (`doctl apps spec get`) instead; see the warning header in `.do/app.yaml`.
+  wipes the token and breaks all subsequent deploys. Edit the live spec over the REST
+  API (rarebit-one/.github's `do-spec-edit.sh`, never a doctl spec round trip) instead; see the
+  warning header in `.do/app.yaml`.
