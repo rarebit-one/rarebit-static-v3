@@ -62,8 +62,9 @@ npm run sync:mcp # regenerate the MCP server's open_source block from the catalo
 - **Contact is MCP-first, form-fallback** (`/connect`; DO Functions under `functions/packages/mcp/`).
   **Never apply `.do/app.yaml` raw**: `doctl apps update --spec` is a full-spec replace
   and the committed file deliberately omits the GITHUB_TOKEN secret — applying it verbatim
-  wipes the token and breaks all subsequent deploys. Merge changes into the live spec
-  (`doctl apps spec get`) instead; see the warning header in `.do/app.yaml`. Detail:
+  wipes the token and breaks all subsequent deploys. Edit the live spec over the REST
+  API (rarebit-one/.github's `do-spec-edit.sh`, never a doctl spec round trip) instead; see the
+  warning header in `.do/app.yaml`. Detail:
   [`docs/agents/contact-mcp.md`](docs/agents/contact-mcp.md).
 - **Shared SVG gradient defs** (`#btn-*`, `#brackets-*`) live once in `Layout.astro`; Button and
   Tagline reference them by id. The Benefits clip-path (`#benefits`) lives in `Benefits.astro`.

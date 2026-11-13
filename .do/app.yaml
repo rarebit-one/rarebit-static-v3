@@ -9,14 +9,19 @@
 # below). Applying it verbatim wipes the token and every subsequent deploy
 # fails at build (project.yml interpolates it). Dashboard env edits have the
 # inverse trap: they regenerate the spec from the last good deployment,
-# discarding spec changes that never went ACTIVE. Instead, merge into the
-# LIVE spec (which carries the secret as a round-trippable EV[...] value):
+# discarding spec changes that never went ACTIVE. Instead, edit the LIVE spec
+# (which carries the secret as a round-trippable EV[...] value) over the REST
+# API with rarebit-one/.github's .github/scripts/do-spec-edit.sh, run from a
+# checkout of that repo: GET /v2/apps/{id} -> your jq filter on the raw spec
+# -> PUT, then it fails (SPEC DRIFT) if DO holds anything else. Dry run first:
 #
-#   doctl apps spec get <APP_ID> > /tmp/live.yaml
-#   <edit /tmp/live.yaml to add your change>
-#   doctl apps update <APP_ID> --spec /tmp/live.yaml && rm /tmp/live.yaml
+#   export DIGITALOCEAN_ACCESS_TOKEN=...   # app read/update, from the vault
+#   .github/scripts/do-spec-edit.sh --name rarebit-static-v3 <APP_ID> '<jq filter>'   # --apply writes
 #
-# ...then mirror the change into this file for version control.
+# ...then mirror the change into this file for version control. Not `doctl
+# apps spec get` -> edit -> `doctl apps update`: a doctl that does not know a
+# spec field drops it on that round trip, and the update deletes it from the
+# live app (fundbright/delivery-ops#1019).
 #
 # The rarebit.one domains were cut over from the retired rarebit-static-v2 app
 # (a domain can only be PRIMARY on one app at a time). The zone is DO-managed,
