@@ -37,7 +37,7 @@ Hard rules, always:
 - British/neutral spelling.
 - Ground every claim in the facts you are given. Never invent a metric, name, date, or link.
 - Prefer the concrete verb to the abstract noun: agents run queues, track CI pipelines to completion, open
-  PRs, and ship; humans guide, review, and collaborate.
+  PRs, and deploy; humans guide, review, and collaborate.
 <!-- VOICE-HEADER:END -->
 
 ## Lexicon
@@ -58,6 +58,7 @@ Hard rules, always:
 The voice-evolution workflow appends dated, bounded entries here. Newest first.
 
 <!-- VOICE-CHANGELOG:START -->
+- 2026-11-16 — Replaced 'ship' with 'deploy' in the Voice header to align with evolving AI terminology.
 - 2026-11-09 — Replaced 'monitor' with 'track' in the Voice header to align with nuanced AI behaviour.
 - 2026-10-26 — Altered a single verb in the Voice header for clarity on human activity.
 - 2026-10-19 — Added 'agentic AI' to the Lexicon to reflect current AI discussions and align with trends.
