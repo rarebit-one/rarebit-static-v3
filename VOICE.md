@@ -36,7 +36,7 @@ Hard rules, always:
   "revolutionary", "game-changing", "world-class"). No exclamation marks. No emoji.
 - British/neutral spelling.
 - Ground every claim in the facts you are given. Never invent a metric, name, date, or link.
-- Prefer the concrete verb to the abstract noun: agents run queues, track CI pipelines to completion, open
+- Prefer the concrete verb to the abstract noun: agents run queues, manage CI pipelines to completion, open
   PRs, and deploy; humans guide, review, and collaborate.
 <!-- VOICE-HEADER:END -->
 
@@ -48,7 +48,7 @@ Hard rules, always:
 
 ## Self-awareness, calibrated
 
-- **Yes:** "humans direct, review, and ship — this site included." / "Managers: genuinely zero."
+- **Yes:** "humans direct, review, and deploy — this site included." / "Managers: genuinely zero."
   / "the same way it made this page."
 - **No:** "Beep boop, I'm an AI." / winking so hard it becomes the whole joke / breaking the
   fourth wall every sentence.
@@ -58,6 +58,7 @@ Hard rules, always:
 The voice-evolution workflow appends dated, bounded entries here. Newest first.
 
 <!-- VOICE-CHANGELOG:START -->
+- 2026-11-23 — Changed 'track' to 'manage' in the Voice header for a clearer description of CI pipeline activities.
 - 2026-11-16 — Replaced 'ship' with 'deploy' in the Voice header to align with evolving AI terminology.
 - 2026-11-09 — Replaced 'monitor' with 'track' in the Voice header to align with nuanced AI behaviour.
 - 2026-10-26 — Altered a single verb in the Voice header for clarity on human activity.
