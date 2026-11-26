@@ -157,8 +157,7 @@ jobs:
   # Crash-heartbeat (house pattern, mirrors the actuator sweeps). The beat's own
   # fail-loud only helps if the job REACHED it. When a run dies earlier — token
   # mint, runner death, quota, `npm ci` — the missed beat would otherwise be
-  # invisible: Slack narration is fail-soft, so a Slack outage swallows the signal
-  # entirely and only a red run in the Actions tab remains. This lands the miss
+  # invisible: only a red run in the Actions tab would remain. This lands the miss
   # somewhere durable instead. Dedupes into ONE open issue, and auto-closes it on
   # the next green run so a recovered beat doesn't leave litter.
   alert:
