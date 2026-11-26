@@ -20,16 +20,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Slack — narrate start (thread root)
-        id: slack
-        continue-on-error: true
-        uses: rarebit-one/.github/.github/actions/slack-deploy-thread@v3  # moving major tag, auto-advanced on .github main (sre-brain#831)
-        with:
-          bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
-          channel: ${{ vars.SLACK_STATIC_V3_CHANNEL_ID }}
-          mode: start
-          text: "🧪 *Weekly rebuild started* — `${{ github.repository }}`\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|run log>"
-
       - name: Trigger DO App Platform deployment
         # App ID = rarebit-static-v3 on App Platform (see .do/app.yaml)
         # A missing DIGITALOCEAN_ACCESS_TOKEN no-ops this step (workflow stays
@@ -56,24 +46,10 @@ jobs:
           fi
           echo "Forced DO rebuild triggered (HTTP ${status})."
 
-      - name: Slack — narrate outcome (thread reply)
-        if: always()
-        continue-on-error: true
-        uses: rarebit-one/.github/.github/actions/slack-deploy-thread@v3  # moving major tag, auto-advanced on .github main (sre-brain#831)
-        with:
-          bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
-          channel: ${{ vars.SLACK_STATIC_V3_CHANNEL_ID }}
-          mode: reply
-          thread_ts: ${{ steps.slack.outputs.thread_ts }}
-          text: >-
-            ${{ job.status == 'success' && '✅ forced DO rebuild triggered' || '🔴 weekly rebuild failed' }}
-            — <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|run log>
-
   # Crash-heartbeat (house pattern, mirrors the actuator sweeps). The beat's own
   # fail-loud only helps if the job REACHED it. When a run dies earlier — token
   # mint, runner death, quota, `npm ci` — the missed beat would otherwise be
-  # invisible: Slack narration is fail-soft, so a Slack outage swallows the signal
-  # entirely and only a red run in the Actions tab remains. This lands the miss
+  # invisible: only a red run in the Actions tab would remain. This lands the miss
   # somewhere durable instead. Dedupes into ONE open issue, and auto-closes it on
   # the next green run so a recovered beat doesn't leave litter.
   alert:

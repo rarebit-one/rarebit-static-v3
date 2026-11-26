@@ -74,16 +74,6 @@ jobs:
           "OPENAI_API_KEY|the Draft step is skipped, so no voice change is proposed"
           "AUTOLAND_PAT|the PR-open step is skipped, so no voice PR is opened"
 
-      - name: Slack — narrate start (thread root)
-        id: slack
-        continue-on-error: true
-        uses: rarebit-one/.github/.github/actions/slack-deploy-thread@v3  # moving major tag, auto-advanced on .github main (sre-brain#831)
-        with:
-          bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
-          channel: ${{ vars.SLACK_STATIC_V3_CHANNEL_ID }}
-          mode: start
-          text: "🧪 *Voice actor started* — `${{ github.repository }}`\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|run log>"
-
       - name: Act (claim an open voice-proposal; reconstruct its signal)
         run: node scripts/voice/act.mjs signal.json claim.json
 
@@ -181,26 +171,28 @@ jobs:
           echo "Releasing claim on #${issue} so it retries next run."
           node -e 'import("./scripts/lib/issues.mjs").then(m=>m.unclaimIssue(Number(process.argv[1])))' "$issue" || true
 
-      - name: Slack — narrate outcome (thread reply)
+      - name: Write the outcome to the run summary
         if: always()
-        continue-on-error: true
-        uses: rarebit-one/.github/.github/actions/slack-deploy-thread@v3  # moving major tag, auto-advanced on .github main (sre-brain#831)
-        with:
-          bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
-          channel: ${{ vars.SLACK_STATIC_V3_CHANNEL_ID }}
-          mode: reply
-          thread_ts: ${{ steps.slack.outputs.thread_ts }}
-          text: >-
-            ${{ job.status != 'success' && format('🔴 voice actor failed — <{0}/{1}/actions/runs/{2}|run log>', github.server_url, github.repository, github.run_id)
-            || (steps.open_pr.outputs.outcome == 'pr' && format('✅ voice evolved — {0}', steps.open_pr.outputs.pr_url))
-            || (steps.open_pr.outputs.outcome == 'unwired' && format('⚠️ voice change found but AUTOLAND_PAT unset — PR not opened — <{0}/{1}/actions/runs/{2}|run log>', github.server_url, github.repository, github.run_id))
-            || format('no voice change — <{0}/{1}/actions/runs/{2}|run log>', github.server_url, github.repository, github.run_id) }}
+        env:
+          JOB_STATUS: ${{ job.status }}
+          OUTCOME: ${{ steps.open_pr.outputs.outcome }}
+          PR_URL: ${{ steps.open_pr.outputs.pr_url }}
+        run: |
+          if [ "$JOB_STATUS" != "success" ]; then
+            msg="voice actor failed"
+          elif [ "$OUTCOME" = "pr" ]; then
+            msg="voice evolved: $PR_URL"
+          elif [ "$OUTCOME" = "unwired" ]; then
+            msg="voice change found but AUTOLAND_PAT unset; PR not opened"
+          else
+            msg="no voice change"
+          fi
+          echo "### $msg" >> "$GITHUB_STEP_SUMMARY"
 
   # Crash-heartbeat (house pattern, mirrors the actuator sweeps). The beat's own
   # fail-loud only helps if the job REACHED it. When a run dies earlier — token
   # mint, runner death, quota, `npm ci` — the missed beat would otherwise be
-  # invisible: Slack narration is fail-soft, so a Slack outage swallows the signal
-  # entirely and only a red run in the Actions tab remains. This lands the miss
+  # invisible: only a red run in the Actions tab would remain. This lands the miss
   # somewhere durable instead. Dedupes into ONE open issue, and auto-closes it on
   # the next green run so a recovered beat doesn't leave litter.
   alert:
