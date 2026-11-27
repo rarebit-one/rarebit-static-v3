@@ -27,7 +27,7 @@ name: Auto-land
 #      The App is installed on every repo in the org and holds
 #      `contents: write` + `pull_requests: write` — exactly what the merge
 #      needs. It NEVER EXPIRES, which is the point: this rung retires the
-#      dependency on a PAT that lapses (rarebit-sre#153).
+#      dependency on a PAT that lapses (an earlier credential expiry).
 #   2. `AUTOLAND_PAT` — retained as the middle rung, not deleted, so this
 #      sweeper still lands push-firing merges if the App is ever uninstalled
 #      here or the mint fails. It is no longer required for normal operation.
